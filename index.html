@@ -1,0 +1,997 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1,user-scalable=no"><meta name="theme-color" content="#060a11"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="도면 생성기"><meta name="robots" content="noindex,nofollow"><link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png"><link rel="icon" href="icons/icon-192.png"><style>body{margin:0;font:14px system-ui}img{max-width:100%}[hidden]{display:none!important}#pin{position:fixed;inset:0;z-index:50;background:#060a11;display:grid;place-items:center;color:#e3f4ff;font-family:"Noto Sans KR",system-ui,sans-serif}#pin .card{display:grid;gap:14px;justify-items:center;width:min(92vw,360px);padding:24px;border:1px solid rgba(94,215,255,.35);border-radius:10px;background:rgba(10,16,26,.85);box-shadow:0 0 36px rgba(94,215,255,.2)}#pin h1{margin:0;font-size:20px;letter-spacing:.06em}#pin p{margin:0;color:#86a3bb;font-size:13px;text-align:center}#pin .dots{display:flex;gap:12px}#pin .dots i{width:14px;height:14px;border-radius:50%;border:1px solid #5ed7ff;display:block}#pin .dots i.on{background:#5ed7ff;box-shadow:0 0 10px #5ed7ff}#pin .keys{display:grid;grid-template-columns:repeat(3,72px);gap:10px}#pin .keys button{height:56px;font-size:22px;border-radius:8px;border:1px solid rgba(94,215,255,.3);background:rgba(255,255,255,.03);color:#e3f4ff;font-family:inherit}#pin .keys button:active{background:rgba(94,215,255,.2)}#pin .err{color:#ff8f5e;min-height:18px;font-size:13px}</style></head><body><div id="pin" hidden><div class="card"><h1>도면 생성기</h1><p>본인 확인을 위해 PIN 4자리를 입력하세요.</p><div class="dots" id="pinDots"><i></i><i></i><i></i><i></i></div><div class="keys" id="pinKeys"></div><div class="err" id="pinErr"></div></div></div><title>도면 생성기</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&family=Rajdhani:wght@500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* 홀로그램 콘솔: 어두운 바탕 위 시안 빛 선, 유리 패널, 느린 스캔 애니메이션. 단일 다크 테마(의도된 선택). */
+:root{
+  --bg:#060a11; --panel:rgba(10,16,26,.78); --panel2:rgba(14,22,36,.9); --fg:#e3f4ff; --muted:#86a3bb; --line:rgba(94,215,255,.22); --line2:rgba(94,215,255,.45);
+  --accent:#5ed7ff; --accent-fg:#04131c; --accent2:#ffb36b; --ok:#67e8a9; --soft:rgba(94,215,255,.10); --stage:#04070c;
+  --glow:0 0 18px rgba(94,215,255,.35); --glow2:0 0 36px rgba(94,215,255,.25);
+  --font:"Noto Sans KR",system-ui,-apple-system,"Segoe UI",sans-serif; --display:"Rajdhani","Noto Sans KR",system-ui,sans-serif; --mono:"JetBrains Mono","Consolas",monospace;
+  color-scheme:dark;
+}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font);font-size:14px;line-height:1.5;display:flex;flex-direction:column;min-height:100%;
+  background-image:radial-gradient(1200px 600px at 70% -10%,rgba(94,215,255,.10),transparent 60%),radial-gradient(800px 500px at 0% 100%,rgba(255,179,107,.06),transparent 60%)}
+button{font:inherit;color:inherit;cursor:pointer}
+input,select{font:inherit;color:inherit}
+button:focus-visible,input:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+::selection{background:rgba(94,215,255,.35)}
+/* 상단 바 */
+header{display:flex;align-items:center;gap:14px;padding-block:10px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));border-bottom:1px solid var(--line);background:linear-gradient(180deg,rgba(10,16,26,.95),rgba(10,16,26,.7));backdrop-filter:blur(10px);flex-wrap:wrap;position:relative;z-index:5}
+header::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:1px;background:linear-gradient(90deg,transparent,var(--accent),transparent);opacity:.6}
+.brand{font-family:var(--display);font-weight:700;font-size:20px;letter-spacing:.06em;white-space:nowrap;text-transform:uppercase;color:#fff;text-shadow:var(--glow)}
+.brand small{display:block;font-family:var(--font);font-weight:400;font-size:11px;color:var(--muted);letter-spacing:.08em;text-transform:none;text-shadow:none}
+.steps{display:flex;gap:6px;flex:1;min-width:0;overflow-x:auto;scrollbar-width:none}
+.steps::-webkit-scrollbar{display:none}
+.step{border:1px solid var(--line);background:rgba(255,255,255,.02);border-radius:4px;padding:6px 12px;display:flex;gap:8px;align-items:center;white-space:nowrap;color:var(--muted);font-family:var(--display);font-weight:600;letter-spacing:.04em;position:relative;transition:border-color .25s,box-shadow .25s,color .25s}
+.step b{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:3px;background:var(--soft);color:var(--fg);font-size:11px;font-variant-numeric:tabular-nums;font-family:var(--mono)}
+.step.on{border-color:var(--accent);color:#fff;box-shadow:var(--glow);background:var(--soft)}
+.step.on b{background:var(--accent);color:var(--accent-fg)}
+.step.done b{background:var(--ok);color:#04131c}
+.step:hover{border-color:var(--line2)}
+/* 본문 */
+main{flex:1;display:grid;grid-template-columns:380px minmax(0,1fr);min-height:0}
+aside{background:var(--panel);backdrop-filter:blur(12px);border-right:1px solid var(--line);display:flex;flex-direction:column;min-width:0;min-height:0;position:relative}
+.panel{flex:1;overflow:auto;padding-block:18px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:16px;display:flex;flex-direction:column;gap:14px;animation:rise .45s cubic-bezier(.2,.8,.2,1) both}
+@keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.panel h2{margin:0;font-family:var(--display);font-size:22px;letter-spacing:.04em;text-wrap:balance;color:#fff}
+.panel h2::before{content:"";display:inline-block;width:8px;height:8px;background:var(--accent);box-shadow:var(--glow);margin-right:10px;transform:rotate(45deg);vertical-align:middle}
+.panel p{margin:0;color:var(--muted)}
+.panel .lead{color:var(--fg)}
+.nav{display:flex;gap:8px;padding:12px 16px;border-top:1px solid var(--line);background:rgba(6,10,17,.6)}
+.btn{border:1px solid var(--line);background:rgba(255,255,255,.03);border-radius:4px;padding:9px 14px;font-weight:500;position:relative;transition:border-color .2s,box-shadow .2s,background .2s,transform .15s}
+.btn:hover{border-color:var(--line2);background:var(--soft);box-shadow:var(--glow)}
+.btn:active{transform:translateY(1px)}
+.btn.primary{background:linear-gradient(180deg,rgba(94,215,255,.95),rgba(60,180,230,.95));color:var(--accent-fg);border-color:transparent;font-weight:700;letter-spacing:.02em;box-shadow:var(--glow)}
+.btn.primary:hover{filter:brightness(1.08);box-shadow:var(--glow2)}
+.btn.ghost{border-color:transparent;color:var(--muted)}
+.btn.sm{padding:6px 10px;font-size:13px}
+.btn.on{background:var(--soft);color:#fff;border-color:var(--accent);box-shadow:var(--glow)}
+.btn[disabled]{opacity:.4;cursor:default;box-shadow:none}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.grow{flex:1}
+.cards{display:grid;gap:10px}
+.card{text-align:left;border:1px solid var(--line);border-radius:6px;padding:12px 14px;background:rgba(255,255,255,.02);display:grid;gap:4px;position:relative;transition:border-color .2s,box-shadow .2s,transform .2s}
+.card::before,.card::after{content:"";position:absolute;width:10px;height:10px;border:1px solid var(--accent);opacity:0;transition:opacity .2s}
+.card::before{left:-1px;top:-1px;border-right:0;border-bottom:0}
+.card::after{right:-1px;bottom:-1px;border-left:0;border-top:0}
+.card:hover{border-color:var(--line2);box-shadow:var(--glow);transform:translateY(-1px)}
+.card:hover::before,.card:hover::after{opacity:1}
+.card b{font-size:15px;color:#fff}
+.card span{color:var(--muted);font-size:13px}
+.tools{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.tools .btn{display:grid;gap:2px;text-align:center;padding:8px 6px;font-size:13px}
+.tools .btn small{color:var(--muted);font-size:11px}
+.tools .btn.on small{color:inherit;opacity:.85}
+.field{display:grid;gap:6px}
+.field label{font-size:11px;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;font-family:var(--display);font-weight:600}
+.field input[type=number],.field input[type=text],.field select{border:1px solid var(--line);background:rgba(0,0,0,.35);border-radius:4px;padding:8px 10px;width:100%;box-sizing:border-box}
+input[type=range]{accent-color:var(--accent)}
+.unit{display:flex;align-items:center;gap:6px}
+.unit input{flex:1;min-width:0}
+.swatches{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+.sw{border:1px solid var(--line);border-radius:5px;padding:0;overflow:hidden;background:rgba(0,0,0,.3);display:grid;gap:4px;padding-bottom:4px;transition:border-color .2s,box-shadow .2s}
+.sw i{display:block;height:34px}
+.sw span{font-size:11px;color:var(--muted);display:block;text-align:center}
+.sw.on{border-color:var(--accent);box-shadow:var(--glow)}
+.sw.on span{color:var(--fg)}
+.cats{display:flex;gap:6px;flex-wrap:wrap}
+.catalog{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.item{border:1px solid var(--line);border-radius:5px;background:rgba(255,255,255,.02);padding:8px 6px;display:grid;gap:4px;justify-items:center;font-size:12px;transition:border-color .2s,box-shadow .2s,transform .15s}
+.item:hover{border-color:var(--accent);box-shadow:var(--glow);transform:translateY(-1px)}
+.item i{width:38px;height:26px;border-radius:3px;display:block}
+.sel{border:1px solid var(--line2);border-radius:6px;padding:10px 12px;display:grid;gap:8px;background:rgba(94,215,255,.06);box-shadow:inset 0 0 24px rgba(94,215,255,.06)}
+.sel .name{font-weight:600;color:#fff}
+.hint{font-size:12px;color:var(--muted);padding:8px 10px;border-left:2px solid var(--accent);background:rgba(94,215,255,.04)}
+.stat{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.stat div{border:1px solid var(--line);border-radius:5px;padding:8px 10px;background:rgba(0,0,0,.25)}
+.stat small{display:block;color:var(--muted);font-size:11px;letter-spacing:.06em;text-transform:uppercase;font-family:var(--display)}
+.stat b{font-size:18px;font-variant-numeric:tabular-nums;font-family:var(--mono);color:var(--accent);text-shadow:var(--glow)}
+.chat{display:grid;gap:8px}
+.chat .log{display:grid;gap:6px;max-height:160px;overflow:auto}
+.bub{padding:7px 10px;border-radius:6px;font-size:13px;max-width:92%}
+.bub.me{background:var(--soft);justify-self:end;border:1px solid var(--line)}
+.bub.ai{background:rgba(0,0,0,.3);border:1px solid var(--line)}
+.chat form{display:flex;gap:6px}
+.chat input{flex:1;min-width:0;border:1px solid var(--line);background:rgba(0,0,0,.35);border-radius:4px;padding:8px 10px}
+table.est{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}
+table.est th,table.est td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:right}
+table.est th:first-child,table.est td:first-child{text-align:left}
+table.est input{width:92px;border:1px solid var(--line);background:rgba(0,0,0,.35);border-radius:4px;padding:3px 6px;text-align:right;font-family:var(--mono)}
+table.est tfoot td{font-weight:700;color:var(--accent);font-family:var(--mono);font-size:15px}
+/* 작업대 */
+.stage{position:relative;background:var(--stage);min-height:0;min-width:0;overflow:hidden;
+  background-image:linear-gradient(rgba(94,215,255,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(94,215,255,.06) 1px,transparent 1px),radial-gradient(900px 500px at 50% 110%,rgba(94,215,255,.12),transparent 70%);background-size:40px 40px,40px 40px,100% 100%}
+.stage::before{content:"";position:absolute;inset:0;pointer-events:none;z-index:2;background:linear-gradient(180deg,transparent 0%,rgba(94,215,255,.08) 50%,transparent 100%);background-size:100% 220px;animation:scan 7s linear infinite;mix-blend-mode:screen;opacity:.7}
+@keyframes scan{from{background-position:0 -220px}to{background-position:0 calc(100% + 220px)}}
+.stage canvas{display:block;width:100%;height:100%;touch-action:none}
+#c2,#c3,#c4{position:absolute;inset:0}
+/* 홀로그램 HUD 모서리 */
+.hud{position:absolute;inset:10px;pointer-events:none;z-index:3}
+.hud i{position:absolute;width:22px;height:22px;border:1.5px solid var(--accent);opacity:.8;filter:drop-shadow(0 0 6px rgba(94,215,255,.6))}
+.hud i:nth-child(1){left:0;top:0;border-right:0;border-bottom:0}
+.hud i:nth-child(2){right:0;top:0;border-left:0;border-bottom:0}
+.hud i:nth-child(3){left:0;bottom:0;border-right:0;border-top:0}
+.hud i:nth-child(4){right:0;bottom:0;border-left:0;border-top:0}
+.readout{position:absolute;right:14px;top:14px;z-index:3;display:grid;gap:4px;font-family:var(--mono);font-size:11px;color:var(--accent);text-align:right;text-shadow:var(--glow);pointer-events:none;letter-spacing:.04em}
+.readout span{opacity:.75;color:var(--muted);text-shadow:none}
+.float{position:absolute;top:14px;left:14px;display:flex;gap:6px;flex-wrap:wrap;z-index:3;max-width:60%}
+.float .btn{background:var(--panel2);backdrop-filter:blur(8px)}
+.zoom{position:absolute;right:14px;bottom:14px;z-index:3;display:grid;gap:4px}
+.zoom .btn{width:40px;height:40px;padding:0;display:grid;place-items:center;font-family:var(--mono);font-size:18px;background:var(--panel2);backdrop-filter:blur(8px)}
+.status{position:absolute;left:14px;bottom:14px;background:var(--panel2);border:1px solid var(--line);border-radius:4px;padding:6px 10px;font-size:12px;color:var(--fg);z-index:3;max-width:calc(100% - 90px);backdrop-filter:blur(8px);font-family:var(--mono);letter-spacing:.02em}
+.status::before{content:"▮ ";color:var(--accent);animation:blink 1.4s steps(2) infinite}
+@keyframes blink{to{opacity:.2}}
+.toolbar{position:absolute;z-index:4;display:flex;gap:4px;background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:4px;box-shadow:var(--glow)}
+.modal{position:fixed;inset:0;background:rgba(2,5,10,.78);backdrop-filter:blur(6px);display:grid;place-items:center;z-index:20;padding:16px;animation:fade .25s both}
+@keyframes fade{from{opacity:0}}
+.modal .box{background:var(--panel2);border:1px solid var(--line2);border-radius:8px;max-width:960px;width:100%;max-height:100%;overflow:auto;display:grid;gap:12px;padding:18px;box-shadow:var(--glow2);animation:rise .35s both}
+.modal img{width:100%;border-radius:4px;display:block;border:1px solid var(--line)}
+.modal h2{font-family:var(--display);letter-spacing:.04em;color:#fff}
+.prog{height:4px;background:rgba(94,215,255,.12);border-radius:2px;overflow:hidden}
+.prog i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),#fff);width:0;transition:width .3s;box-shadow:var(--glow)}
+.tag{display:inline-block;font-size:11px;border:1px solid var(--line);border-radius:3px;padding:1px 8px;color:var(--muted);font-family:var(--display);letter-spacing:.06em;text-transform:uppercase}
+.ok{color:var(--ok)}
+.sheet{background:#fff;color:#111;border-radius:4px;overflow:auto}
+.sheet svg{display:block;width:100%;height:auto}
+/* 프레젠테이션(상담) 모드 */
+body.present aside,body.present header .steps,body.present #btnReset{display:none}
+body.present main{grid-template-columns:1fr}
+body.present .present-bar{display:flex}
+.present-bar{display:none;position:absolute;left:50%;bottom:18px;transform:translateX(-50%);z-index:4;gap:8px;align-items:center;background:var(--panel2);border:1px solid var(--line2);border-radius:8px;padding:8px 10px;box-shadow:var(--glow2);max-width:calc(100% - 32px);width:720px;backdrop-filter:blur(10px)}
+.present-bar input{flex:1;min-width:0;border:1px solid var(--line);background:rgba(0,0,0,.4);border-radius:4px;padding:10px 12px;font-size:15px}
+button{touch-action:manipulation}
+.handle{display:none;border:0;background:transparent;padding:6px 0 2px;width:100%;cursor:pointer}
+.handle i{display:block;width:44px;height:5px;border-radius:3px;background:var(--line2);margin:0 auto;box-shadow:var(--glow)}
+@media (max-width:860px){
+  main{grid-template-columns:1fr;grid-template-rows:minmax(0,1fr) auto}
+  .stage{order:1;min-height:38vh}
+  aside{order:2;border-right:0;border-top:1px solid var(--line);max-height:58vh;transition:max-height .25s ease}
+  aside.collapsed{max-height:118px}
+  aside.half{max-height:40vh}
+  aside.collapsed .panel{display:none}
+  .handle{display:block}
+  .panel{padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:10px}
+  .nav{padding:8px 12px calc(8px + env(safe-area-inset-bottom,0px))}
+  .btn{min-height:40px}
+  .tools .btn{min-height:52px}
+  .float{max-width:calc(100% - 28px);gap:4px;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
+  .float .btn{white-space:nowrap;flex:0 0 auto}
+  .float .btn{padding:6px 9px;font-size:12px}
+  .readout{display:none}
+  .status{top:auto;bottom:12px;left:12px;right:68px;max-width:none;font-size:11px}
+  .zoom .btn{width:36px;height:36px}
+  .hud{inset:6px}
+  .present-bar{width:calc(100% - 24px);bottom:12px}
+  header{gap:8px;padding-block:8px;row-gap:6px}
+  .brand{font-size:17px}
+  .brand small{display:none}
+  .steps{order:3;flex-basis:100%;gap:4px;padding-bottom:2px}
+  .step{padding:7px 10px;font-size:13px;flex:1 0 auto;justify-content:center}
+  .step b{width:18px;height:18px;font-size:10px}
+  #btnPresent,#btnReset{padding:6px 10px;font-size:12px;min-height:34px}
+  .modal{padding:8px}
+  .modal .box{padding:12px;gap:10px}
+  .catalog{grid-template-columns:repeat(4,1fr)}
+  .swatches{grid-template-columns:repeat(5,1fr)}
+}
+@media (prefers-reduced-motion: reduce){ *{transition:none!important;animation:none!important} .stage::before{display:none} }
+</style>
+
+<header>
+  <div class="brand">뚝딱 인테리어<small>그리면 바로 3D, 가구와 조명까지</small></div>
+  <nav class="steps" id="steps" aria-label="단계"></nav>
+  <button class="btn sm" id="btnPresent" title="패널을 숨기고 3D만 크게 보여 줍니다">상담 모드</button>
+  <button class="btn sm ghost" id="btnReset" title="처음부터 다시">초기화</button>
+</header>
+
+<main>
+  <aside id="aside">
+    <button class="handle" id="sheetToggle" aria-label="메뉴 접기/펼치기"><i></i></button>
+    <div class="panel" id="panel"></div>
+    <div class="nav">
+      <button class="btn" id="btnPrev">이전</button>
+      <span class="grow"></span>
+      <button class="btn primary" id="btnNext">다음</button>
+    </div>
+  </aside>
+  <section class="stage" id="stage">
+    <canvas id="c2"></canvas>
+    <canvas id="c3" hidden></canvas>
+    <div class="hud" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+    <div class="readout" id="readout" aria-live="polite"></div>
+    <div class="float" id="float"></div>
+    <div class="zoom" id="zoom"><button class="btn" id="zIn" title="확대">+</button><button class="btn" id="zOut" title="축소">−</button><button class="btn" id="zFit" title="전체 보기" style="font-size:13px">⤢</button></div>
+    <div class="status" id="status">시작 방법을 고르세요.</div>
+    <div class="present-bar" id="presentBar"><input type="text" id="presentCmd" placeholder="말로 수정: “벽을 벽지 베이지로”, “소파 추가”, “우물천장 넣어줘”" autocomplete="off"><button class="btn primary" id="presentGo">적용</button><button class="btn" id="presentExit">나가기</button></div>
+  </section>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+/* ============================ 데이터 ============================ */
+const STEPS = [
+  {k:"space", n:"공간 만들기"}, {k:"size", n:"치수·정리"}, {k:"view", n:"3D로 보기"}, {k:"furnish", n:"가구·조명"}, {k:"render", n:"투시도"}
+];
+let uid = 1; const nid = () => "e" + (uid++);
+const emptyState = () => ({
+  outline: [], walls: [], rooms: [], items: [], floor: "wood", wallColor: "white", ceilH: 2700,
+  photo: null, photoW: 0, photoH: 0, photoScale: 10, photoX: 0, photoY: 0, night: false,
+  cam: {x: 0, y: 0, dir: 0, h: 1500, fov: 70}, started: false,
+  roomPhoto: null, comp: {layers: []}, wallFin: "paint", cove: false, baseboard: true, doorColor: "wood", holo: false, spin: false
+});
+// 항목 치수: 카탈로그 항목 또는 사진 컷아웃(type "photo", 자체 치수)
+const D = (it) => it.type === "photo" ? {n: it.name || "내 가구", w: it.w, d: Math.max(100, Math.round(it.w * 0.45)), h: it.h, c: 5, photo: true} : (it.w ? Object.assign({}, ITEM[it.type], {w: it.w}) : ITEM[it.type]);
+let S = emptyState();
+let step = 0, mode = "select", sel = null, selWall = null, hover = null, pending = null, undo = [];
+let view2d = true;
+
+const FLOORS = {
+  wood:    {n:"밝은 나무", c1:"#d9c3a3", c2:"#c8ae89", kind:"plank", fin:"wood"},
+  grey:    {n:"그레이 마루", c1:"#b7b3ad", c2:"#a39f98", kind:"plank", fin:"wood"},
+  walnut:  {n:"월넛 마루", c1:"#7a5a40", c2:"#654831", kind:"plank", fin:"wood"},
+  herring: {n:"헤링본", c1:"#cdb08c", c2:"#b89773", kind:"herring", fin:"wood"},
+  tile:    {n:"밝은 타일", c1:"#e9e4dc", c2:"#d8d2c8", kind:"tile", fin:"tile"},
+  marble:  {n:"대리석 600각", c1:"#efece6", c2:"#d6d1c9", kind:"marble", fin:"tile"},
+  terrazzo:{n:"테라조", c1:"#dcd7cf", c2:"#8a8580", kind:"terrazzo", fin:"tile"},
+  carpet:  {n:"카펫", c1:"#8d8a93", c2:"#7d7a84", kind:"noise", fin:"carpet"},
+  concrete:{n:"콘크리트", c1:"#a9a7a3", c2:"#9b9994", kind:"noise", fin:"concrete"},
+};
+const WALLCOLORS = {
+  white:{n:"화이트", c:"#f2f0eb"}, ivory:{n:"아이보리", c:"#efe7d6"}, beige:{n:"베이지", c:"#e6dccb"}, blush:{n:"블러시", c:"#e8cfc4"}, grey:{n:"그레이", c:"#b9b8b3"},
+  charcoal:{n:"차콜", c:"#4a4b4e"}, navy:{n:"네이비", c:"#2f3d5c"}, green:{n:"세이지", c:"#9aa98f"}, terracotta:{n:"테라코타", c:"#b8674a"}, mustard:{n:"머스터드", c:"#c9a24a"}
+};
+// 벽 마감: 색은 WALLCOLORS, 패턴은 아래
+const WALLFIN = { paint:{n:"페인트"}, wallpaper:{n:"벽지(줄무늬)"}, tile:{n:"타일"}, wood:{n:"우드 패널"}, stone:{n:"스톤(석재)"}, brick:{n:"벽돌"} };
+const DOORCOLORS = { wood:{n:"원목", c:"#b08a62"}, white:{n:"화이트", c:"#f1efe9"}, dark:{n:"다크", c:"#3b3a3c"} };
+const PALETTE = ["#cfc6b8", "#8a6a4f", "#4a4e57", "#b94b36", "#6f8f7a", "#f0ede6"];
+// 가구·조명 카탈로그: 치수 mm (w=가로, d=세로, h=높이)
+const CAT = {
+  living:{n:"거실·로비", items:{
+    sofa:{n:"소파", w:2000, d:850, h:800, c:0}, armchair:{n:"1인 소파", w:850, d:850, h:800, c:0},
+    coffee:{n:"커피테이블", w:1000, d:600, h:420, c:1}, rug:{n:"러그", w:2000, d:1400, h:12, c:5},
+    tvstand:{n:"TV장", w:1600, d:420, h:520, c:1}, counter:{n:"카운터", w:2400, d:600, h:1050, c:5},
+    bench:{n:"벤치", w:1500, d:400, h:450, c:1}, plant:{n:"화분", w:550, d:550, h:1500, c:4},
+  }},
+  work:{n:"사무·식사", items:{
+    desk:{n:"책상", w:1400, d:700, h:740, c:1}, ochair:{n:"사무 의자", w:600, d:600, h:900, c:2},
+    table:{n:"테이블", w:1400, d:800, h:740, c:1}, chair:{n:"의자", w:450, d:480, h:860, c:1},
+    rtable:{n:"원형 테이블", w:1000, d:1000, h:740, c:5}, partition:{n:"파티션", w:1200, d:60, h:1500, c:0},
+  }},
+  storage:{n:"수납·침실", items:{
+    builtin:{n:"붙박이장", w:1800, d:600, h:0, c:5, len:1}, base:{n:"하부장(싱크)", w:1800, d:600, h:870, c:5, len:1}, upper:{n:"상부장", w:1800, d:350, h:700, c:5, len:1, z:1450},
+    shelf:{n:"책장", w:900, d:350, h:1900, c:1}, cabinet:{n:"수납장", w:1200, d:450, h:850, c:5},
+    wardrobe:{n:"옷장", w:1200, d:600, h:2200, c:5}, locker:{n:"사물함", w:400, d:500, h:1800, c:0},
+    bed:{n:"침대", w:1600, d:2000, h:500, c:5}, nightstand:{n:"협탁", w:500, d:400, h:550, c:1},
+  }},
+  biz:{n:"상업공간", items:{
+    sign:{n:"간판(벽부착)", w:1800, d:80, h:500, c:3, wall:1, z:2000}, pos:{n:"POS 카운터", w:1200, d:600, h:1000, c:5}, display:{n:"진열대", w:1200, d:450, h:1500, c:1, len:1},
+    hanger:{n:"의류 행거", w:1200, d:500, h:1600, c:2, len:1}, mirror:{n:"거울벽", w:2000, d:30, h:2200, c:5, wall:1, len:1}, speaker:{n:"스피커", w:400, d:400, h:1800, c:2},
+    stage:{n:"무대 단(300)", w:3000, d:2000, h:300, c:1, len:1}, barstool:{n:"바 스툴", w:400, d:400, h:750, c:2}, waitseat:{n:"대기 의자(3연)", w:1500, d:600, h:800, c:0},
+    cafetable:{n:"카페 테이블", w:700, d:700, h:740, c:5}, lockerrow:{n:"사물함(5칸)", w:2000, d:500, h:1800, c:5, len:1},
+  }},
+  light:{n:"조명", items:{
+    dl:{n:"다운라이트", light:1, w:120, d:120, h:20, lum:1.0, warm:0, fx:"dl"},
+    line:{n:"라인 조명", light:1, w:1200, d:60, h:40, lum:1.6, warm:0, fx:"line"},
+    pend:{n:"펜던트", light:1, w:350, d:350, h:300, lum:1.2, warm:1, drop:900, fx:"pend"},
+    chand:{n:"샹들리에", light:1, w:800, d:800, h:600, lum:2.6, warm:1, drop:600, fx:"chand"},
+    wl:{n:"벽등", light:1, w:200, d:120, h:300, lum:0.7, warm:1, wall:1, fx:"wl"},
+    floorlamp:{n:"스탠드", light:1, w:400, d:400, h:1600, lum:0.9, warm:1, stand:1},
+    spot:{n:"스포트", light:1, w:120, d:120, h:150, lum:1.2, warm:0, fx:"spot"},
+  }},
+};
+const ITEM = {}; for (const c of Object.values(CAT)) for (const [k, v] of Object.entries(c.items)) ITEM[k] = v;
+
+/* 샘플: 4층 연습실 (실제 프로젝트를 단순화) */
+function sample4F() {
+  const s = emptyState(); s.started = true;
+  s.outline = [[0,0],[18000,0],[18000,17800],[0,17800]].map(([x,y]) => ({x, y}));
+  rebuildOuter(s);
+  const W = (x1,y1,x2,y2,kind) => s.walls.push({id:nid(), x1,y1,x2,y2, kind: kind || "wall", ops:[]});
+  W(7700,5800,7700,17800); W(0,5800,7700,5800); W(9100,0,9100,5800); W(9100,4500,13600,4500);
+  W(13600,0,13600,4500); W(15100,0,15100,4500); W(16000,8300,16000,15000); W(9500,8300,15000,8300,"glass");
+  W(5000,0,5000,2400); W(5000,2400,7300,2400); W(7300,2400,7300,5800);
+  // 문
+  const door = (wi, a) => s.walls[wi].ops.push({id:nid(), t:"door", at:a, w:900});
+  const win = (wi, a, w) => s.walls[wi].ops.push({id:nid(), t:"window", at:a, w});
+  door(4, 2300); door(5, 400); door(6, 1000); door(8, 300); door(10, 1200);
+  win(0, 7000, 2400); win(0, 10800, 2400); win(0, 14000, 2400); win(3, 1200, 4000);
+  s.projectName = "4층 연습실 · 댄스 스튜디오"; s.floor = "grey"; s.wallColor = "white"; s.cove = true; s.walls[13].fin = "wood"; s.walls[13].col = "navy";
+  const I = (type, x, y, rot, extra) => s.items.push(Object.assign({id:nid(), type, x, y, rot: rot || 0, c: ITEM[type].c, lum: ITEM[type].lum}, extra || {}));
+  I("counter", 11350, 4950, 0); I("sofa", 13900, 7650, 180); I("coffee", 13900, 6450); I("armchair", 12400, 6500, 90); I("armchair", 15300, 6500, -90);
+  I("plant", 15400, 4950); I("plant", 9600, 8000); I("rug", 13900, 6900);
+  I("desk", 9900, 1200, 90); I("ochair", 10600, 1200, -90); I("desk", 9900, 3300, 90); I("ochair", 10600, 3300, -90);
+  I("rtable", 12300, 2500); I("chair", 12300, 1750, 180); I("chair", 12300, 3250); I("desk", 16550, 1500); I("ochair", 16550, 2200, 180); I("shelf", 17700, 3300, 90);
+  I("bench", 350, 12000, 90); for (let i = 0; i < 8; i++) I("locker", 5600 + i * 400, 350);
+  I("chand", 3850, 9000); I("chand", 3850, 14500); I("chand", 12500, 6300, 0, {lum: 2.0});
+  for (const [x, y] of [[9800,7000],[14800,5200],[10200,5200],[12300,1000],[11000,3800],[16500,800],[16500,3800],[6500,1200],[8300,4000],[17000,9500],[17000,13500],[8400,7000]]) I("dl", x, y);
+  for (const y of [7000, 10500, 14000]) { I("line", 1800, y); I("line", 5900, y); }
+  for (const x of [1200, 3850, 6500]) I("spot", x, 5950);
+  s.cam = {x: 8300, y: 7700, dir: Math.atan2(-3000, 4100), h: 1500, fov: 75};
+  return s;
+}
+
+/* ============================ 유틸 ============================ */
+const $ = (q) => document.querySelector(q);
+const el = (tag, attrs, ...kids) => { const e = document.createElement(tag); for (const [k, v] of Object.entries(attrs || {})) { if (v == null || v === false) continue; if (k === "class") e.className = v; else if (k.startsWith("on")) e.addEventListener(k.slice(2), v); else if (k === "html") e.innerHTML = v; else e.setAttribute(k, v); } for (const c of kids.flat()) if (c != null) e.append(c.nodeType ? c : document.createTextNode(c)); return e; };
+const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+const wlen = (w) => Math.hypot(w.x2 - w.x1, w.y2 - w.y1);
+const snap = (v, g = 50) => Math.round(v / g) * g;
+function polyArea(pts) { let a = 0; for (let i = 0; i < pts.length; i++) { const p = pts[i], q = pts[(i + 1) % pts.length]; a += p.x * q.y - q.x * p.y; } return Math.abs(a) / 2; }
+function bbox() { const xs = [], ys = []; for (const p of S.outline) { xs.push(p.x); ys.push(p.y); } for (const w of S.walls) { xs.push(w.x1, w.x2); ys.push(w.y1, w.y2); } for (const r of S.rooms) for (const p of r.pts) { xs.push(p.x); ys.push(p.y); } if (!xs.length) return {x0: 0, y0: 0, x1: 10000, y1: 8000}; return {x0: Math.min(...xs), y0: Math.min(...ys), x1: Math.max(...xs), y1: Math.max(...ys)}; }
+function pointSeg(p, a, b) { const dx = b.x - a.x, dy = b.y - a.y, L2 = dx * dx + dy * dy || 1; let t = ((p.x - a.x) * dx + (p.y - a.y) * dy) / L2; t = Math.max(0, Math.min(1, t)); const q = {x: a.x + dx * t, y: a.y + dy * t}; return {d: dist(p, q), t, q}; }
+function rebuildOuter(s) { s = s || S; s.walls = s.walls.filter(w => !w.outer); const n = s.outline.length; if (n < 3) return; for (let i = 0; i < n; i++) { const a = s.outline[i], b = s.outline[(i + 1) % n]; s.walls.push({id: nid(), x1: a.x, y1: a.y, x2: b.x, y2: b.y, kind: "wall", outer: true, ops: []}); } }
+function floorPolys() { const r = S.rooms.length ? S.rooms : (S.outline.length >= 3 ? [{pts: S.outline, fin: S.floor}] : []); return r; }
+function pushUndo() { undo.push(JSON.stringify(S)); if (undo.length > 40) undo.shift(); }
+function doUndo() { if (!undo.length) return; S = JSON.parse(undo.pop()); sel = null; selWall = null; changed(); }
+function save() { try { const copy = Object.assign({}, S); if (copy.photo && copy.photo.length > 1500000) copy.photo = null; let js = JSON.stringify(copy); if (js.length > 4500000) { copy.comp = {layers: []}; copy.roomPhoto = null; js = JSON.stringify(copy); } if (js.length > 4500000) { copy.items = copy.items.filter(i => i.type !== "photo"); js = JSON.stringify(copy); } localStorage.setItem("easy-interior-v1", js); } catch (e) {} }
+function changed() { save(); draw2d(); if (!view2d) rebuild3d(); else updateReadout(); renderPanel(); }
+
+/* ============================ 2D 캔버스 ============================ */
+const c2 = $("#c2"), ctx = c2.getContext("2d");
+let VZ = {s: 0.04, ox: 60, oy: 60}, autoFit = true; // mm → px; autoFit: 사용자가 확대·이동하기 전까지 창 크기에 맞춰 자동 맞춤
+const toPx = (x, y) => [x * VZ.s + VZ.ox, y * VZ.s + VZ.oy];
+const toMm = (px, py) => ({x: (px - VZ.ox) / VZ.s, y: (py - VZ.oy) / VZ.s});
+function fit2d() { const b = bbox(); const r = c2.getBoundingClientRect(); const w = Math.max(1000, b.x1 - b.x0), h = Math.max(1000, b.y1 - b.y0); VZ.s = Math.max(0.004, Math.min(Math.max(1, r.width - 80) / w, Math.max(1, r.height - 80) / h)); VZ.ox = (r.width - w * VZ.s) / 2 - b.x0 * VZ.s; VZ.oy = (r.height - h * VZ.s) / 2 - b.y0 * VZ.s; }
+let photoImg = null;
+function loadPhoto() { if (!S.photo) { photoImg = null; return; } const im = new Image(); im.onload = () => { photoImg = im; draw2d(); }; im.src = S.photo; }
+function resize2d() { const r = c2.getBoundingClientRect(); const dpr = Math.min(2, window.devicePixelRatio || 1); c2.width = r.width * dpr; c2.height = r.height * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0); }
+const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+function draw2d() {
+  if (!view2d) return;
+  const r = c2.getBoundingClientRect(); ctx.clearRect(0, 0, r.width, r.height);
+  const dark = matchMedia("(prefers-color-scheme: dark)").matches && document.documentElement.dataset.theme !== "light" || document.documentElement.dataset.theme === "dark";
+  const ink = dark ? "#e8e6e0" : "#262a27", faint = dark ? "rgba(255,255,255,.07)" : "rgba(0,0,0,.06)", accent = css("--accent");
+  // 밑그림 사진
+  if (photoImg) { ctx.save(); ctx.globalAlpha = .45; const [px, py] = toPx(S.photoX, S.photoY); ctx.drawImage(photoImg, px, py, S.photoW * S.photoScale * VZ.s, S.photoH * S.photoScale * VZ.s); ctx.restore(); }
+  // 1m 격자
+  ctx.strokeStyle = faint; ctx.lineWidth = 1; const g = 1000 * VZ.s; if (g > 12) { const sx = VZ.ox % g, sy = VZ.oy % g; ctx.beginPath(); for (let x = sx; x < r.width; x += g) { ctx.moveTo(x, 0); ctx.lineTo(x, r.height); } for (let y = sy; y < r.height; y += g) { ctx.moveTo(0, y); ctx.lineTo(r.width, y); } ctx.stroke(); }
+  // 바닥
+  for (const room of floorPolys()) { const f = FLOORS[room.fin] || FLOORS[S.floor]; ctx.fillStyle = f.c1; ctx.globalAlpha = photoImg ? .35 : .9; ctx.beginPath(); room.pts.forEach((p, i) => { const [x, y] = toPx(p.x, p.y); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }); ctx.closePath(); ctx.fill(); ctx.globalAlpha = 1; }
+  // 외곽선 그리는 중
+  if (mode === "outline" && S.outline.length && !S.walls.some(w => w.outer)) { ctx.strokeStyle = accent; ctx.lineWidth = 2; ctx.setLineDash([6, 4]); ctx.beginPath(); S.outline.forEach((p, i) => { const [x, y] = toPx(p.x, p.y); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }); if (hover) { const [hx, hy] = toPx(hover.x, hover.y); ctx.lineTo(hx, hy); } ctx.stroke(); ctx.setLineDash([]); for (const p of S.outline) { const [x, y] = toPx(p.x, p.y); ctx.fillStyle = accent; ctx.beginPath(); ctx.arc(x, y, 4, 0, 7); ctx.fill(); } if (S.outline.length >= 3) { const [x, y] = toPx(S.outline[0].x, S.outline[0].y); ctx.strokeStyle = accent; ctx.beginPath(); ctx.arc(x, y, 9, 0, 7); ctx.stroke(); } }
+  // 러그(바닥 위 납작한 것) 먼저
+  for (const it of S.items) if (it.type === "rug") drawItem(it, ink, accent);
+  // 벽
+  for (const w of S.walls) {
+    const th = Math.max(3, (w.kind === "glass" ? 60 : (w.outer ? 200 : 150)) * VZ.s);
+    const [ax, ay] = toPx(w.x1, w.y1), [bx, by] = toPx(w.x2, w.y2);
+    const L = wlen(w); const ux = (w.x2 - w.x1) / (L || 1), uy = (w.y2 - w.y1) / (L || 1);
+    ctx.lineCap = "butt"; ctx.lineWidth = th;
+    ctx.strokeStyle = w === selWall ? accent : (w.kind === "glass" ? (dark ? "#7fb3d6" : "#4f8fbf") : ink);
+    // 개구부 구간은 비우고 그리기
+    const cuts = w.ops.map(o => [o.at, o.at + o.w]).sort((a, b) => a[0] - b[0]); let t = 0; ctx.beginPath();
+    for (const [a, b] of cuts) { if (a > t) { ctx.moveTo(...toPx(w.x1 + ux * t, w.y1 + uy * t)); ctx.lineTo(...toPx(w.x1 + ux * a, w.y1 + uy * a)); } t = Math.max(t, b); }
+    if (t < L) { ctx.moveTo(...toPx(w.x1 + ux * t, w.y1 + uy * t)); ctx.lineTo(bx, by); } ctx.stroke();
+    for (const o of w.ops) { const [ox, oy] = toPx(w.x1 + ux * o.at, w.y1 + uy * o.at), [ex, ey] = toPx(w.x1 + ux * (o.at + o.w), w.y1 + uy * (o.at + o.w));
+      if (o.t === "window") { ctx.strokeStyle = dark ? "#7fb3d6" : "#4f8fbf"; ctx.lineWidth = Math.max(2, th * .35); ctx.beginPath(); ctx.moveTo(ox, oy); ctx.lineTo(ex, ey); ctx.stroke(); }
+      else { ctx.strokeStyle = ink; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(ox, oy); ctx.lineTo(ex, ey); ctx.stroke(); ctx.beginPath(); const ang = Math.atan2(uy, ux); ctx.arc(ox, oy, Math.max(0, o.w * VZ.s), ang - Math.PI / 2, ang, false); ctx.stroke(); ctx.beginPath(); ctx.moveTo(ox, oy); ctx.lineTo(ox + Math.cos(ang - Math.PI / 2) * o.w * VZ.s, oy + Math.sin(ang - Math.PI / 2) * o.w * VZ.s); ctx.stroke(); }
+    }
+    if (mode === "size" || step === 1) { const [mx, my] = toPx((w.x1 + w.x2) / 2, (w.y1 + w.y2) / 2); ctx.fillStyle = w === selWall ? accent : (dark ? "#bbb" : "#555"); ctx.font = "11px " + css("--font"); ctx.textAlign = "center"; ctx.fillText((L / 1000).toFixed(2) + " m", mx, my - th / 2 - 4); }
+  }
+  // 끌어서 그리는 중인 선
+  if (drag && drag.kind === "stroke" && drag.pts.length > 1) { ctx.strokeStyle = accent; ctx.lineWidth = 3; ctx.lineJoin = "round"; ctx.globalAlpha = .8; ctx.beginPath(); drag.pts.forEach((q, i) => { const [x, y] = toPx(q.x, q.y); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }); ctx.stroke(); ctx.globalAlpha = 1; }
+  if (drag && drag.kind === "rect" && hover) { const [ax, ay] = toPx(drag.a.x, drag.a.y), [bx, by] = toPx(hover.x, hover.y); ctx.strokeStyle = accent; ctx.lineWidth = 3; ctx.setLineDash([6, 4]); ctx.strokeRect(Math.min(ax, bx), Math.min(ay, by), Math.abs(bx - ax), Math.abs(by - ay)); ctx.setLineDash([]); ctx.fillStyle = accent; ctx.font = "12px " + css("--font"); ctx.fillText(`${(Math.abs(hover.x - drag.a.x) / 1000).toFixed(1)} × ${(Math.abs(hover.y - drag.a.y) / 1000).toFixed(1)} m`, Math.max(ax, bx) + 8, Math.min(ay, by) - 6); }
+  // 벽 그리는 중
+  if (pending && hover) { const [ax, ay] = toPx(pending.x, pending.y), [bx, by] = toPx(hover.x, hover.y); ctx.strokeStyle = accent; ctx.lineWidth = 3; ctx.setLineDash([6, 4]); ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke(); ctx.setLineDash([]); ctx.fillStyle = accent; ctx.font = "12px " + css("--font"); ctx.fillText((dist(pending, hover) / 1000).toFixed(2) + " m", bx + 8, by - 8); }
+  // 가구·조명
+  for (const it of S.items) if (it.type !== "rug") drawItem(it, ink, accent);
+  // 카메라
+  if (step === 4 || mode === "cam") { const [cx, cy] = toPx(S.cam.x, S.cam.y); const a = S.cam.dir, f = (S.cam.fov * Math.PI / 180) / 2, R = Math.max(0, 2500 * VZ.s); ctx.fillStyle = accent; ctx.globalAlpha = .18; ctx.beginPath(); ctx.moveTo(cx, cy); ctx.arc(cx, cy, R, a - f, a + f); ctx.closePath(); ctx.fill(); ctx.globalAlpha = 1; ctx.beginPath(); ctx.arc(cx, cy, 6, 0, 7); ctx.fill(); ctx.strokeStyle = accent; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(a) * 30, cy + Math.sin(a) * 30); ctx.stroke(); }
+  // 커서 스냅 표시
+  if (hover && (mode === "outline" || mode === "wall")) { const [hx, hy] = toPx(hover.x, hover.y); ctx.strokeStyle = accent; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(hx - 8, hy); ctx.lineTo(hx + 8, hy); ctx.moveTo(hx, hy - 8); ctx.lineTo(hx, hy + 8); ctx.stroke(); }
+}
+function drawItem(it, ink, accent) {
+  const d = D(it); if (!d) return; const [x, y] = toPx(it.x, it.y); ctx.save(); ctx.translate(x, y); ctx.rotate(it.rot * Math.PI / 180);
+  const w = d.w * VZ.s, h = d.d * VZ.s;
+  if (d.photo) { const im = cutoutImg(it); ctx.fillStyle = "rgba(255,255,255,.55)"; ctx.fillRect(-w / 2, -h / 2, w, h); if (im && im.complete) { const ar = im.width / im.height; let iw = w, ih = iw / ar; if (ih > h * 1.6) { ih = h * 1.6; iw = ih * ar; } ctx.drawImage(im, -iw / 2, -ih / 2, iw, ih); } ctx.strokeStyle = it === sel ? accent : ink; ctx.lineWidth = it === sel ? 2.5 : 1; ctx.strokeRect(-w / 2, -h / 2, w, h); ctx.restore(); return; }
+  if (d.light) { ctx.fillStyle = "#f2c14e"; ctx.strokeStyle = it === sel ? accent : "#a8841e"; ctx.lineWidth = it === sel ? 2 : 1; ctx.beginPath(); if (d.fx === "line") ctx.rect(-w / 2, -h / 2, w, h); else ctx.arc(0, 0, Math.max(5, w / 2), 0, 7); ctx.fill(); ctx.stroke(); }
+  else { ctx.fillStyle = PALETTE[it.c ?? d.c]; ctx.globalAlpha = .9; ctx.fillRect(-w / 2, -h / 2, w, h); ctx.globalAlpha = 1; ctx.strokeStyle = it === sel ? accent : ink; ctx.lineWidth = it === sel ? 2.5 : 1; ctx.strokeRect(-w / 2, -h / 2, w, h); if (w > 40) { ctx.fillStyle = ink; ctx.font = "11px " + css("--font"); ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(d.n, 0, 0); } }
+  ctx.restore();
+}
+// 입력
+let drag = null, lastTouchDist = 0; const pointers = new Map(); let lastPointerType = "mouse";
+const isMobile = () => matchMedia("(max-width:860px)").matches;
+const tol = () => (lastPointerType === "touch" ? 2.2 : 1);
+function pinchStart() { const [a, b] = [...pointers.values()]; drag = {kind: "pinch", d0: Math.hypot(a.x - b.x, a.y - b.y) || 1, mx: (a.x + b.x) / 2, my: (a.y + b.y) / 2, s0: VZ.s, ox0: VZ.ox, oy0: VZ.oy}; pending = null; autoFit = false; }
+function pinchMove() { if (!drag || drag.kind !== "pinch" || pointers.size < 2) return; const [a, b] = [...pointers.values()]; const d = Math.hypot(a.x - b.x, a.y - b.y) || 1, k = Math.max(.2, Math.min(5, d / drag.d0)); const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2; VZ.s = drag.s0 * k; VZ.ox = mx - (drag.mx - drag.ox0) * k; VZ.oy = my - (drag.my - drag.oy0) * k; draw2d(); }
+function pos(e) { const r = c2.getBoundingClientRect(); return {px: e.clientX - r.left, py: e.clientY - r.top}; }
+function snapPoint(p) { let q = {x: snap(p.x, 100), y: snap(p.y, 100)}; const pts = [...S.outline, ...S.walls.flatMap(w => [{x: w.x1, y: w.y1}, {x: w.x2, y: w.y2}])]; const tol = 12 / VZ.s; for (const c of pts) { if (Math.abs(c.x - q.x) < tol) q.x = c.x; if (Math.abs(c.y - q.y) < tol) q.y = c.y; } const ref = pending || (mode === "outline" && S.outline.length ? S.outline[S.outline.length - 1] : null); if (ref) { if (Math.abs(q.x - ref.x) < 15 / VZ.s) q.x = ref.x; if (Math.abs(q.y - ref.y) < 15 / VZ.s) q.y = ref.y; } return q; }
+function hitItem(p) { for (let i = S.items.length - 1; i >= 0; i--) { const it = S.items[i], d = D(it); const a = -it.rot * Math.PI / 180, dx = p.x - it.x, dy = p.y - it.y; const lx = dx * Math.cos(a) - dy * Math.sin(a), ly = dx * Math.sin(a) + dy * Math.cos(a); const pad = (d.light ? 150 : 0) + (lastPointerType === "touch" ? 120 : 0); if (Math.abs(lx) <= d.w / 2 + pad && Math.abs(ly) <= d.d / 2 + pad) return it; } return null; }
+function hitWall(p) { let best = null, bd = 18 * tol() / VZ.s; for (const w of S.walls) { const r = pointSeg(p, {x: w.x1, y: w.y1}, {x: w.x2, y: w.y2}); if (r.d < bd) { bd = r.d; best = {w, t: r.t}; } } return best; }
+c2.addEventListener("pointerdown", (e) => {
+  try { c2.setPointerCapture(e.pointerId); } catch (err) {} const {px, py} = pos(e); const p = toMm(px, py); lastPointerType = e.pointerType || "mouse";
+  pointers.set(e.pointerId, {x: px, y: py}); if (pointers.size === 2) { if (drag && drag.kind === "item") { undo.pop(); } pinchStart(); draw2d(); return; } if (pointers.size > 2) return;
+  if (e.button === 1 || e.button === 2 || mode === "pan") { drag = {kind: "pan", px, py, ox: VZ.ox, oy: VZ.oy}; return; }
+  if (mode === "outline" || mode === "wall") { drag = {kind: "stroke", pts: [p], raw: p, px, py}; return; }
+  if (mode === "rect") { drag = {kind: "rect", a: snapPoint(p)}; return; }
+  if (mode === "door" || mode === "window" || mode === "glass" || mode === "erase" || mode === "size") {
+    const h = hitWall(p); if (!h) { if (mode === "erase") { const it = hitItem(p); if (it) { pushUndo(); S.items = S.items.filter(i => i !== it); changed(); } } return; }
+    if (mode === "size") { selWall = h.w; draw2d(); renderPanel(); return; }
+    pushUndo();
+    if (mode === "glass") { h.w.kind = h.w.kind === "glass" ? "wall" : "glass"; }
+    else if (mode === "erase") { if (h.w.outer) { setStatus("바깥 벽은 지울 수 없어요. 공간을 다시 만들려면 초기화하세요."); undo.pop(); return; } S.walls = S.walls.filter(w => w !== h.w); }
+    else { const L = wlen(h.w), w = mode === "door" ? 900 : 1500; let at = Math.max(100, Math.min(L - w - 100, h.t * L - w / 2)); if (L < w + 200) { setStatus("벽이 너무 짧아요."); undo.pop(); return; } h.w.ops.push({id: nid(), t: mode, at: snap(at, 50), w}); }
+    changed(); return;
+  }
+  if (mode === "cam") { S.cam.x = p.x; S.cam.y = p.y; drag = {kind: "camdir"}; draw2d(); return; }
+  // select
+  const it = hitItem(p); if (it) { sel = it; selWall = null; drag = {kind: "item", it, dx: it.x - p.x, dy: it.y - p.y, moved: false}; pushUndo(); draw2d(); renderPanel(); return; }
+  const hw = hitWall(p); if (hw && step <= 1) { selWall = hw.w; sel = null; draw2d(); renderPanel(); return; }
+  sel = null; selWall = null; drag = {kind: "pan", px, py, ox: VZ.ox, oy: VZ.oy}; draw2d(); renderPanel();
+});
+c2.addEventListener("pointermove", (e) => {
+  const {px, py} = pos(e); const p = toMm(px, py);
+  if (pointers.has(e.pointerId)) pointers.set(e.pointerId, {x: px, y: py}); if (drag && drag.kind === "pinch") { pinchMove(); return; }
+  if (drag) { if (drag.kind === "stroke") { const last = drag.pts[drag.pts.length - 1]; if (dist(last, p) > 6 / VZ.s) drag.pts.push(p); hover = snapPoint(p); draw2d(); setStatus(`끌어서 그리는 중 · ${(strokeLen(drag.pts) / 1000).toFixed(1)} m`); return; } if (drag.kind === "rect") { hover = snapPoint(p); draw2d(); return; } if (drag.kind === "pan") { autoFit = false; VZ.ox = drag.ox + px - drag.px; VZ.oy = drag.oy + py - drag.py; draw2d(); } else if (drag.kind === "item") { drag.it.x = snap(p.x + drag.dx, 50); drag.it.y = snap(p.y + drag.dy, 50); drag.moved = true; snapWallItem(drag.it); draw2d(); } else if (drag.kind === "camdir") { S.cam.dir = Math.atan2(p.y - S.cam.y, p.x - S.cam.x); draw2d(); } return; }
+  hover = (mode === "outline" || mode === "wall") ? snapPoint(p) : p; if (mode === "outline" || mode === "wall") draw2d();
+  if (mode === "outline" || mode === "wall") setStatus(`x ${(hover.x / 1000).toFixed(2)} m · y ${(hover.y / 1000).toFixed(2)} m` + (pending ? ` · 길이 ${(dist(pending, hover) / 1000).toFixed(2)} m` : ""));
+});
+c2.addEventListener("pointerup", (e) => {
+  pointers.delete(e.pointerId); if (drag && drag.kind === "pinch") { if (pointers.size < 2) drag = null; return; }
+  if (drag && drag.kind === "stroke") { const pts = drag.pts, L = strokeLen(pts); drag = null;
+    if (L < 250 * tol()) { // 짧으면 '누르기'로 처리: 외곽은 점 추가, 벽은 두 점 찍기
+      const q = snapPoint(pts[0]);
+      if (mode === "outline") { if (S.outline.length >= 3 && dist(q, S.outline[0]) < 14 * tol() / VZ.s) { finishOutline(); return; } pushUndo(); S.outline.push(q); draw2d(); renderPanel(); return; }
+      if (!pending) { pending = q; } else { if (dist(pending, q) > 100) { pushUndo(); S.walls.push({id: nid(), x1: pending.x, y1: pending.y, x2: q.x, y2: q.y, kind: "wall", ops: []}); } pending = null; changed(); } return; }
+    pending = null; const poly = rectify(simplify(pts, Math.max(250, 10 / VZ.s)));
+    if (mode === "outline") { if (poly.length < 3) { setStatus("모서리가 세 개 이상 되도록 둘러 그려 주세요."); draw2d(); return; } pushUndo(); S.outline = poly.map(q => ({x: snap(q.x, 50), y: snap(q.y, 50)})); finishOutline(); return; }
+    pushUndo(); let n = 0; for (let i = 0; i < poly.length - 1; i++) { const a = joinNear(poly[i]), b = joinNear(poly[i + 1]); if (dist(a, b) > 200) { S.walls.push({id: nid(), x1: snap(a.x, 50), y1: snap(a.y, 50), x2: snap(b.x, 50), y2: snap(b.y, 50), kind: "wall", ops: []}); n++; } }
+    tidy({quiet: true}); setStatus(`벽 ${n}개를 그렸습니다. 삐뚤어도 괜찮아요. 다음 단계의 ‘정리하기’가 직각으로 맞춰 줍니다.`); changed(); return; }
+  if (drag && drag.kind === "rect") { const a = drag.a, b = snapPoint(toMm(...Object.values(pos(e)))); drag = null; const w = Math.abs(b.x - a.x), h = Math.abs(b.y - a.y); if (w < 300 || h < 300) { draw2d(); return; } const x0 = Math.min(a.x, b.x), y0 = Math.min(a.y, b.y); pushUndo();
+    if (S.outline.length < 3) { S.outline = [[x0, y0], [x0 + w, y0], [x0 + w, y0 + h], [x0, y0 + h]].map(([x, y]) => ({x, y})); finishOutline(); return; }
+    for (const [p1, p2] of [[[x0, y0], [x0 + w, y0]], [[x0 + w, y0], [x0 + w, y0 + h]], [[x0 + w, y0 + h], [x0, y0 + h]], [[x0, y0 + h], [x0, y0]]]) S.walls.push({id: nid(), x1: p1[0], y1: p1[1], x2: p2[0], y2: p2[1], kind: "wall", ops: []});
+    tidy({quiet: true}); changed(); return; }
+  if (drag && drag.kind === "item") { if (!drag.moved) undo.pop(); else { save(); if (!view2d) rebuild3d(); } } if (drag && drag.kind === "camdir") { save(); renderPanel(); } drag = null; });
+c2.addEventListener("pointercancel", (e) => { pointers.delete(e.pointerId); if (drag && drag.kind === "pinch" && pointers.size < 2) drag = null; });
+c2.addEventListener("dblclick", () => { if (mode === "outline" && S.outline.length >= 3) finishOutline(); });
+c2.addEventListener("wheel", (e) => { e.preventDefault(); autoFit = false; const {px, py} = pos(e); const k = e.deltaY < 0 ? 1.12 : 1 / 1.12; VZ.ox = px - (px - VZ.ox) * k; VZ.oy = py - (py - VZ.oy) * k; VZ.s *= k; draw2d(); }, {passive: false});
+c2.addEventListener("contextmenu", (e) => e.preventDefault());
+window.addEventListener("keydown", (e) => { if (e.target.tagName === "INPUT") return; if (e.key === "Escape") { pending = null; if (mode === "outline" && S.outline.length >= 3) finishOutline(); draw2d(); } if (e.key === "Delete" || e.key === "Backspace") { if (sel) { pushUndo(); S.items = S.items.filter(i => i !== sel); sel = null; changed(); } } if ((e.ctrlKey || e.metaKey) && e.key === "z") { e.preventDefault(); doUndo(); } if (e.key === "r" && sel) { pushUndo(); sel.rot = (sel.rot + 90) % 360; changed(); } });
+function finishOutline() { if (S.outline.length < 3) return; pushUndo(); S.outline = rectify(S.outline, true).map(q => ({x: snap(q.x, 50), y: snap(q.y, 50)})); rebuildOuter(); S.started = true; mode = "select"; pending = null; setStatus(`공간 완성: 약 ${(polyArea(S.outline) / 1e6).toFixed(1)} ㎡ (${(polyArea(S.outline) / 3.3058e6).toFixed(1)} 평)`); changed(); }
+function snapWallItem(it) { const d = D(it); if (!(d.wall || ["shelf", "cabinet", "wardrobe", "locker", "tvstand", "counter", "partition", "builtin", "base", "upper", "bed", "display", "hanger", "lockerrow", "waitseat"].includes(it.type))) return; const h = hitWallNear(it, 600); if (!h) return; const w = h.w, L = wlen(w), ux = (w.x2 - w.x1) / L, uy = (w.y2 - w.y1) / L; const nx = -uy, ny = ux; const side = ((it.x - w.x1) * nx + (it.y - w.y1) * ny) >= 0 ? 1 : -1; const off = ((w.kind === "glass" ? 30 : (w.outer ? 100 : 75)) + d.d / 2) * side; it.x = h.q.x + nx * off; it.y = h.q.y + ny * off; it.rot = Math.round((Math.atan2(uy, ux) * 180 / Math.PI + (side > 0 ? 0 : 180)) / 90) * 90; }
+function hitWallNear(p, tol) { let best = null, bd = tol; for (const w of S.walls) { const r = pointSeg(p, {x: w.x1, y: w.y1}, {x: w.x2, y: w.y2}); if (r.d < bd) { bd = r.d; best = {w, t: r.t, q: r.q}; } } return best; }
+function setStatus(t) { $("#status").textContent = t; }
+function strokeLen(pts) { let L = 0; for (let i = 1; i < pts.length; i++) L += dist(pts[i - 1], pts[i]); return L; }
+// Douglas-Peucker 단순화: 손으로 그린 곡선 → 꺾인 점 몇 개
+function simplify(pts, tol) { if (pts.length < 3) return pts.slice(); const keep = new Array(pts.length).fill(false); keep[0] = keep[pts.length - 1] = true; const stack = [[0, pts.length - 1]]; while (stack.length) { const [a, b] = stack.pop(); let imax = -1, dmax = 0; for (let i = a + 1; i < b; i++) { const d = pointSeg(pts[i], pts[a], pts[b]).d; if (d > dmax) { dmax = d; imax = i; } } if (dmax > tol && imax > 0) { keep[imax] = true; stack.push([a, imax], [imax, b]); } } let out = pts.filter((_, i) => keep[i]); if (dist(out[0], out[out.length - 1]) < tol * 1.5 && out.length > 3) out.pop(); return out; }
+// 직각/45도 보정: 거의 수평·수직인 구간은 정확히 맞춤 (closed=true면 다각형으로 간주)
+function rectify(poly, closed) { const out = poly.map(q => ({x: q.x, y: q.y})); const n = out.length; const segs = closed ? n : n - 1; for (let i = 0; i < segs; i++) { const a = out[i], b = out[(i + 1) % n]; const ang = Math.atan2(b.y - a.y, b.x - a.x) * 180 / Math.PI; const k = Math.round(ang / 45) * 45; if (Math.abs(ang - k) > 14) continue; if (k % 180 === 0) b.y = a.y; else if (Math.abs(k) === 90) b.x = a.x; else { const L = dist(a, b) / Math.SQRT2; b.x = a.x + Math.sign(Math.cos(k * Math.PI / 180)) * L; b.y = a.y + Math.sign(Math.sin(k * Math.PI / 180)) * L; } } if (closed && n >= 3) { const a = out[n - 1], b = out[0]; const ang = Math.atan2(b.y - a.y, b.x - a.x) * 180 / Math.PI, k = Math.round(ang / 45) * 45; if (Math.abs(ang - k) <= 14) { if (k % 180 === 0) a.y = b.y; else if (Math.abs(k) === 90) a.x = b.x; } } return out; }
+function allPoints() { const pts = []; for (const w of S.walls) pts.push({x: w.x1, y: w.y1}, {x: w.x2, y: w.y2}); for (const q of S.outline) pts.push(q); return pts; }
+function joinNear(q, tol = 300) { let best = null, bd = tol; for (const c of allPoints()) { const d = dist(q, c); if (d < bd) { bd = d; best = c; } } if (best) return {x: best.x, y: best.y}; const h = hitWallNear(q, tol); if (h) return {x: h.q.x, y: h.q.y}; return q; }
+// 자동 정리: 짧은 벽 제거 → 각도 보정 → 가까운 끝점 합치기 → 같은 선상 정렬 → T자 접합 → 격자 맞춤
+function tidy(opt = {}) {
+  const rep_ = {removed: 0, angled: 0, joined: 0, aligned: 0, tee: 0};
+  const inner = () => S.walls.filter(w => !w.outer);
+  const before = S.walls.length; S.walls = S.walls.filter(w => w.outer || wlen(w) >= 150); rep_.removed = before - S.walls.length;
+  for (const w of inner()) { const ang = Math.atan2(w.y2 - w.y1, w.x2 - w.x1) * 180 / Math.PI, k = Math.round(ang / 45) * 45; if (Math.abs(ang - k) > 0.01 && Math.abs(ang - k) <= 14) { const L = wlen(w), mx = (w.x1 + w.x2) / 2, my = (w.y1 + w.y2) / 2, r = k * Math.PI / 180; w.x1 = mx - Math.cos(r) * L / 2; w.y1 = my - Math.sin(r) * L / 2; w.x2 = mx + Math.cos(r) * L / 2; w.y2 = my + Math.sin(r) * L / 2; rep_.angled++; } }
+  // 끝점 합치기 (바깥 벽·외곽 꼭짓점 포함)
+  const refs = []; for (const w of S.walls) { refs.push({o: w, kx: "x1", ky: "y1"}, {o: w, kx: "x2", ky: "y2"}); } for (const q of S.outline) refs.push({o: q, kx: "x", ky: "y"});
+  const used = new Set(); for (let i = 0; i < refs.length; i++) { if (used.has(i)) continue; const a = refs[i]; const grp = [i]; for (let j = i + 1; j < refs.length; j++) { if (used.has(j)) continue; const b = refs[j]; if (Math.hypot(a.o[a.kx] - b.o[b.kx], a.o[a.ky] - b.o[b.ky]) < 250) grp.push(j); } if (grp.length > 1) { const cx = snap(grp.reduce((m, g) => m + refs[g].o[refs[g].kx], 0) / grp.length, 50), cy = snap(grp.reduce((m, g) => m + refs[g].o[refs[g].ky], 0) / grp.length, 50); let moved = false; for (const g of grp) { const r = refs[g]; if (r.o[r.kx] !== cx || r.o[r.ky] !== cy) moved = true; r.o[r.kx] = cx; r.o[r.ky] = cy; used.add(g); } if (moved) rep_.joined++; } }
+  // 같은 선상 정렬: 수직 벽끼리 x, 수평 벽끼리 y 가 200mm 이내면 같은 값으로
+  const vert = inner().filter(w => Math.abs(w.x1 - w.x2) < 1), hor = inner().filter(w => Math.abs(w.y1 - w.y2) < 1);
+  const align = (list, k1, k2) => { const done = new Set(); for (const w of list) { if (done.has(w)) continue; const grp = list.filter(v => !done.has(v) && Math.abs(v[k1] - w[k1]) < 200); if (grp.length > 1) { const v = snap(grp.reduce((m, g) => m + g[k1], 0) / grp.length, 50); for (const g of grp) { if (g[k1] !== v) rep_.aligned++; g[k1] = v; g[k2] = v; done.add(g); } } } };
+  align(vert, "x1", "x2"); align(hor, "y1", "y2");
+  // T자 접합: 끝점이 다른 벽 몸통에 가까우면 그 벽 위로
+  for (const w of inner()) for (const [kx, ky] of [["x1", "y1"], ["x2", "y2"]]) { const q = {x: w[kx], y: w[ky]}; let best = null, bd = 250; for (const v of S.walls) { if (v === w) continue; const r = pointSeg(q, {x: v.x1, y: v.y1}, {x: v.x2, y: v.y2}); if (r.d < bd && r.t > 0.02 && r.t < 0.98) { bd = r.d; best = r.q; } } if (best && bd > 0.5) { w[kx] = snap(best.x, 50); w[ky] = snap(best.y, 50); rep_.tee++; } }
+  for (const w of S.walls) { w.x1 = snap(w.x1, 50); w.y1 = snap(w.y1, 50); w.x2 = snap(w.x2, 50); w.y2 = snap(w.y2, 50); }
+  S.walls = S.walls.filter(w => wlen(w) >= 100);
+  if (!opt.quiet) { const parts = []; if (rep_.angled) parts.push(`벽 ${rep_.angled}개를 직각·45도로`); if (rep_.joined) parts.push(`끊긴 모서리 ${rep_.joined}곳 연결`); if (rep_.aligned) parts.push(`어긋난 선 ${rep_.aligned}개 정렬`); if (rep_.tee) parts.push(`T자 접합 ${rep_.tee}곳`); if (rep_.removed) parts.push(`너무 짧은 선 ${rep_.removed}개 제거`); setStatus(parts.length ? "정리 완료: " + parts.join(", ") : "이미 깔끔합니다. 고칠 곳이 없어요."); }
+  return rep_;
+}
+// 개략 견적 (참고용 단가, 사용자가 수정 가능)
+const RATES_DEFAULT = {floor_wood: 95000, floor_tile: 120000, floor_carpet: 60000, floor_concrete: 70000, wall_paint: 25000, wall_wallpaper: 30000, wall_tile: 150000, wall_wood: 180000, wall_stone: 220000, wall_brick: 160000, ceiling: 30000, cove: 120000, door: 450000, window: 600000, glass: 350000, light_dl: 45000, light_line: 120000, light_pend: 180000, light_chand: 900000, light_wl: 90000, light_spot: 70000, light_upper: 0, elec_base: 350000, elec_per: 40000, builtin: 1200000, base: 900000, upper: 600000, demo: 20000, misc_pct: 10};
+const RATE_LABEL = {floor_wood: "바닥 마루 ㎡", floor_tile: "바닥 타일·석재 ㎡", floor_carpet: "바닥 카펫 ㎡", floor_concrete: "바닥 에폭시 ㎡", wall_paint: "벽 페인트 ㎡", wall_wallpaper: "벽지 ㎡", wall_tile: "벽 타일 ㎡", wall_wood: "벽 우드패널 ㎡", wall_stone: "벽 석재 ㎡", wall_brick: "벽 벽돌 ㎡", ceiling: "천장 도장 ㎡", cove: "우물천장·간접조명 m", door: "문(설치 포함) 개", window: "창 개", glass: "통유리벽 ㎡", light_dl: "다운라이트 개", light_line: "라인조명 개", light_pend: "펜던트 개", light_chand: "샹들리에 개", light_wl: "벽등 개", light_spot: "스포트 개", elec_base: "전기 기본공사 식", elec_per: "조명 배선 개소", builtin: "붙박이장 m", base: "하부장 m", upper: "상부장 m", demo: "철거·폐기 ㎡", misc_pct: "기타경비·이윤 %"};
+function estimate() {
+  const R = Object.assign({}, RATES_DEFAULT, S.rates || {}); const rows = []; const add = (key, qty, unit, label) => { if (qty <= 0) return; const rate = R[key] || 0; rows.push({key, label: label || RATE_LABEL[key], qty, unit, rate, amount: Math.round(qty * rate)}); };
+  if (S.outline.length < 3) return {rows, total: 0, sub: 0};
+  const H = S.ceilH / 1000; let areaFloor = 0; const byFloor = {};
+  for (const r of floorPolys()) { const a = polyArea(r.pts) / 1e6; areaFloor += a; const fin = (FLOORS[r.fin] || FLOORS[S.floor]).fin; byFloor[fin] = (byFloor[fin] || 0) + a; }
+  for (const [fin, a] of Object.entries(byFloor)) add(fin === "tile" ? "floor_tile" : fin === "carpet" ? "floor_carpet" : fin === "concrete" ? "floor_concrete" : "floor_wood", +a.toFixed(1), "㎡");
+  const byWall = {}; let glassArea = 0, doors = 0, windows = 0;
+  for (const w of S.walls) { const L = wlen(w) / 1000; if (w.kind === "glass") { glassArea += L * H; continue; } let a = L * H * (w.outer ? 1 : 2); for (const o of w.ops) { a -= (o.w / 1000) * (o.t === "door" ? 2.1 : 1.4) * (w.outer ? 1 : 2); if (o.t === "door") doors++; else windows++; } const fin = w.fin || S.wallFin || "paint"; byWall[fin] = (byWall[fin] || 0) + Math.max(0, a); }
+  for (const [fin, a] of Object.entries(byWall)) add("wall_" + fin, +a.toFixed(1), "㎡");
+  add("ceiling", +areaFloor.toFixed(1), "㎡"); if (S.cove) add("cove", +(S.outline.reduce((m, q, i) => m + dist(q, S.outline[(i + 1) % S.outline.length]), 0) / 1000).toFixed(1), "m");
+  add("door", doors, "개"); add("window", windows, "개"); add("glass", +glassArea.toFixed(1), "㎡");
+  const cnt = {}; for (const it of S.items) cnt[it.type] = (cnt[it.type] || 0) + 1; let nLights = 0;
+  for (const k of ["dl", "line", "pend", "chand", "wl", "spot"]) if (cnt[k]) { add("light_" + k, cnt[k], "개"); nLights += cnt[k]; }
+  if (nLights) { add("elec_base", 1, "식"); add("elec_per", nLights, "개소"); }
+  for (const k of ["builtin", "base", "upper"]) { const len = S.items.filter(i => i.type === k).reduce((m, i) => m + D(i).w / 1000, 0); if (len) add(k, +len.toFixed(1), "m"); }
+  add("demo", +areaFloor.toFixed(1), "㎡");
+  const sub = rows.reduce((m, r) => m + r.amount, 0); const misc = Math.round(sub * (R.misc_pct || 0) / 100); if (misc) rows.push({key: "misc_pct", label: RATE_LABEL.misc_pct, qty: R.misc_pct, unit: "%", rate: null, amount: misc});
+  return {rows, sub, total: sub + misc};
+}
+function showEstimate() {
+  const modal = el("div", {class: "modal"}); const box_ = el("div", {class: "box", style: "max-width:760px"}); modal.append(box_); document.body.append(modal);
+  const render = () => { const e = estimate(); box_.innerHTML = ""; const tb = el("table", {class: "est"}); tb.append(el("thead", {}, el("tr", {}, el("th", {}, "항목"), el("th", {}, "수량"), el("th", {}, "단가(원)"), el("th", {}, "금액(원)"))));
+    const body = el("tbody"); for (const r of e.rows) { const rate = r.rate == null ? el("span", {}, "") : el("input", {type: "number", value: String(r.rate), step: "1000", onchange: (ev) => { S.rates = S.rates || {}; S.rates[r.key] = +ev.target.value; save(); render(); updateReadout(); }}); body.append(el("tr", {}, el("td", {}, r.label), el("td", {}, `${r.qty.toLocaleString()} ${r.unit}`), el("td", {}, r.key === "misc_pct" ? el("input", {type: "number", value: String(r.qty), step: "1", onchange: (ev) => { S.rates = S.rates || {}; S.rates.misc_pct = +ev.target.value; save(); render(); updateReadout(); }}) : rate), el("td", {}, r.amount.toLocaleString()))); } tb.append(body);
+    tb.append(el("tfoot", {}, el("tr", {}, el("td", {}, "합계 (부가세 별도)"), el("td", {}, ""), el("td", {}, ""), el("td", {}, "₩ " + e.total.toLocaleString()))));
+    box_.append(el("h2", {style: "margin:0;font-size:18px"}, "개략 견적"), el("p", {class: "hint"}, "지금 그린 평면에서 바로 산출한 참고용 수량과 금액입니다. 단가는 지역·자재·업체에 따라 다르니 셀을 눌러 직접 고치세요. 실제 견적은 현장 실측 후 확정됩니다."), el("div", {style: "overflow:auto"}, tb), el("div", {class: "row"}, el("button", {class: "btn", onclick: () => { S.rates = {}; save(); render(); updateReadout(); }}, "단가 초기화"), el("button", {class: "btn", onclick: async () => { const csv = "항목,수량,단위,단가,금액\n" + e.rows.map(r => [r.label, r.qty, r.unit, r.rate ?? "", r.amount].join(",")).join("\n") + `\n합계,,,,${e.total}`; if (downloads) { try { await downloads.save({filename: "estimate.csv", data: csv}); } catch (err) { setStatus("저장이 취소되었거나 실패했습니다."); } } else { try { await navigator.clipboard.writeText(csv); setStatus("견적을 클립보드에 복사했습니다."); } catch (err) { setStatus("이 화면에서는 저장을 지원하지 않습니다."); } } }}, "CSV 저장"), el("span", {class: "grow"}), el("button", {class: "btn ghost", onclick: () => modal.remove()}, "닫기"))); };
+  render();
+}
+// ---- 시공 도면 SVG (A3 가로 420×297mm, 1/100 또는 자동 축척) ----
+function sheetSVG(kind) {
+  const b = bbox(); const W = b.x1 - b.x0, Dp = b.y1 - b.y0; const pad = 40; const avail = {w: 420 - 30 - 2 * pad, h: 297 - 20 - 2 * pad - 36}; const sc = Math.min(avail.w / (W / 1000), avail.h / (Dp / 1000)) ; // mm on paper per m
+  const scaleDen = Math.round(1000 / sc); const ox = 15 + pad + (avail.w - W / 1000 * sc) / 2, oy = 10 + pad + (avail.h - Dp / 1000 * sc) / 2; const X = (x) => (ox + (x - b.x0) / 1000 * sc).toFixed(2), Y = (y) => (oy + (y - b.y0) / 1000 * sc).toFixed(2);
+  const esc = (t) => String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;"); let g = "";
+  g += `<rect x="10" y="10" width="400" height="277" fill="none" stroke="#111" stroke-width=".6"/>`;
+  // 1m 격자
+  g += `<g stroke="#999" stroke-width=".12" stroke-dasharray="1 1">`; for (let x = Math.ceil(b.x0 / 1000) * 1000; x <= b.x1; x += 1000) g += `<line x1="${X(x)}" y1="${Y(b.y0) - 0}" x2="${X(x)}" y2="${Y(b.y1)}"/>`; for (let y = Math.ceil(b.y0 / 1000) * 1000; y <= b.y1; y += 1000) g += `<line x1="${X(b.x0)}" y1="${Y(y)}" x2="${X(b.x1)}" y2="${Y(y)}"/>`; g += `</g>`;
+  // 바닥 해치(평면도만)
+  if (kind === "A") for (const r of floorPolys()) g += `<polygon points="${r.pts.map(q => X(q.x) + "," + Y(q.y)).join(" ")}" fill="#f3f3f3" stroke="none"/>`;
+  // 벽
+  for (const w of S.walls) { const th = (w.kind === "glass" ? 40 : (w.outer ? 200 : 150)) / 1000 * sc; const L = wlen(w); const ux = (w.x2 - w.x1) / L, uy = (w.y2 - w.y1) / L; const cuts = w.ops.map(o => [o.at, o.at + o.w]).sort((a, c) => a[0] - c[0]); let t = 0; const seg = (a, c) => { if (c - a < 1) return; g += `<line x1="${X(w.x1 + ux * a)}" y1="${Y(w.y1 + uy * a)}" x2="${X(w.x1 + ux * c)}" y2="${Y(w.y1 + uy * c)}" stroke="${w.kind === "glass" ? "#2a7fb8" : "#111"}" stroke-width="${th.toFixed(2)}" ${w.kind === "glass" ? 'stroke-dasharray="2 .8"' : ""}/>`; };
+    for (const [a, c] of cuts) { seg(t, a); t = Math.max(t, c); } seg(t, L);
+    for (const o of w.ops) { const ax = w.x1 + ux * o.at, ay = w.y1 + uy * o.at, bx = w.x1 + ux * (o.at + o.w), by = w.y1 + uy * (o.at + o.w); if (o.t === "window") { g += `<line x1="${X(ax)}" y1="${Y(ay)}" x2="${X(bx)}" y2="${Y(by)}" stroke="#2a7fb8" stroke-width="${(th * .3).toFixed(2)}"/><line x1="${X(ax)}" y1="${Y(ay)}" x2="${X(bx)}" y2="${Y(by)}" stroke="#fff" stroke-width="${(th * .08).toFixed(2)}"/>`; } else { const r = o.w / 1000 * sc; const ang = Math.atan2(uy, ux); const ex = X(ax + Math.cos(ang - Math.PI / 2) * o.w), ey = Y(ay + Math.sin(ang - Math.PI / 2) * o.w); g += `<line x1="${X(ax)}" y1="${Y(ay)}" x2="${ex}" y2="${ey}" stroke="#111" stroke-width=".3"/><path d="M ${ex} ${ey} A ${r.toFixed(2)} ${r.toFixed(2)} 0 0 1 ${X(bx)} ${Y(by)}" fill="none" stroke="#111" stroke-width=".2"/>`; } }
+    if (kind === "A" && !w.outer && L >= 600) { const mx = (w.x1 + w.x2) / 2, my = (w.y1 + w.y2) / 2; g += `<text x="${X(mx)}" y="${(+Y(my) - th - 1).toFixed(2)}" font-size="2.4" text-anchor="middle" fill="#333" font-family="sans-serif">${(L / 1000).toFixed(2)}</text>`; } }
+  // 실명·면적
+  for (const r of floorPolys()) { const cx = r.pts.reduce((m, q) => m + q.x, 0) / r.pts.length, cy = r.pts.reduce((m, q) => m + q.y, 0) / r.pts.length; const a = polyArea(r.pts) / 1e6; if (kind === "A") g += `<text x="${X(cx)}" y="${Y(cy)}" font-size="4" text-anchor="middle" font-weight="700" fill="#111" font-family="sans-serif">${esc(r.name || "실내")}</text><text x="${X(cx)}" y="${(+Y(cy) + 5).toFixed(2)}" font-size="3" text-anchor="middle" fill="#333" font-family="sans-serif">${a.toFixed(1)} ㎡ (${(a / 3.3058).toFixed(1)}평) · FL: ${esc((FLOORS[r.fin] || FLOORS[S.floor]).n)}</text>`; }
+  // 가구(평면도: 가는 선)
+  if (kind === "A") for (const it of S.items) { const d = D(it); if (d.light) continue; const hw = d.w / 1000 * sc / 2, hd = d.d / 1000 * sc / 2; g += `<g transform="translate(${X(it.x)} ${Y(it.y)}) rotate(${it.rot})"><rect x="${(-hw).toFixed(2)}" y="${(-hd).toFixed(2)}" width="${(hw * 2).toFixed(2)}" height="${(hd * 2).toFixed(2)}" fill="none" stroke="#555" stroke-width=".25"/>${hw > 5 ? `<text x="0" y="1" font-size="2.2" text-anchor="middle" fill="#555" font-family="sans-serif">${esc(d.n)}</text>` : ""}</g>`; }
+  // 전등·전열(E): 기구 기호 + 우물천장 + 회로
+  if (kind === "E") { const sym = {dl: (x, y) => `<circle cx="${x}" cy="${y}" r="1.6" fill="#fff" stroke="#111" stroke-width=".35"/><line x1="${x - 1.6}" y1="${y}" x2="${x + 1.6}" y2="${y}" stroke="#111" stroke-width=".3"/>`, spot: (x, y) => `<circle cx="${x}" cy="${y}" r="1.5" fill="#111"/><line x1="${x}" y1="${y - 2.6}" x2="${x}" y2="${y + 2.6}" stroke="#111" stroke-width=".4"/>`, pend: (x, y) => `<circle cx="${x}" cy="${y}" r="1.8" fill="none" stroke="#111" stroke-width=".35"/><circle cx="${x}" cy="${y}" r=".6" fill="#111"/>`, chand: (x, y) => `<circle cx="${x}" cy="${y}" r="2.6" fill="none" stroke="#111" stroke-width=".4"/><path d="M${x - 2.6} ${y}L${x + 2.6} ${y}M${x} ${y - 2.6}L${x} ${y + 2.6}M${x - 1.8} ${y - 1.8}L${x + 1.8} ${y + 1.8}M${x - 1.8} ${y + 1.8}L${x + 1.8} ${y - 1.8}" stroke="#111" stroke-width=".3"/>`, wl: (x, y) => `<path d="M${x - 1.8} ${y + 1.5}L${x + 1.8} ${y + 1.5}L${x} ${y - 1.8}Z" fill="#fff" stroke="#111" stroke-width=".35"/>`, line: (x, y, rot, w) => `<rect x="${x - w / 2}" y="${y - 1}" width="${w}" height="2" fill="#fff" stroke="#111" stroke-width=".35" transform="rotate(${rot} ${x} ${y})"/>`};
+    let n = 0; for (const it of S.items) { const d = D(it); if (!d.light || !sym[it.type]) continue; n++; const x = +X(it.x), y = +Y(it.y); g += sym[it.type](x, y, it.rot, (d.w / 1000) * sc); }
+    if (S.cove) { const pts = S.outline; const cx = pts.reduce((m, q) => m + q.x, 0) / pts.length, cy = pts.reduce((m, q) => m + q.y, 0) / pts.length; g += `<polygon points="${pts.map(q => X(q.x + Math.sign(cx - q.x) * 450) + "," + Y(q.y + Math.sign(cy - q.y) * 450)).join(" ")}" fill="none" stroke="#d08020" stroke-width=".4" stroke-dasharray="2.5 1"/>`; }
+    // 범례
+    const legend = [["dl", "다운라이트 LED 15W"], ["line", "라인조명 LED"], ["pend", "펜던트"], ["chand", "샹들리에"], ["wl", "벽등 (H=1.9m)"], ["spot", "스포트라이트"]]; let ly = 40; g += `<rect x="330" y="30" width="78" height="${legend.length * 8 + 22}" fill="#fff" stroke="#111" stroke-width=".4"/><text x="334" y="36.5" font-size="3.4" font-weight="700" font-family="sans-serif">범례 LEGEND</text>`; for (const [k, label] of legend) { const cnt = S.items.filter(i => i.type === k).length; if (!cnt) continue; g += sym[k](340, ly + 1, 0, 8) + `<text x="348" y="${ly + 2.2}" font-size="2.8" font-family="sans-serif">${label} × ${cnt}</text>`; ly += 8; } if (S.cove) g += `<line x1="334" y1="${ly + 1}" x2="346" y2="${ly + 1}" stroke="#d08020" stroke-width=".5" stroke-dasharray="2.5 1"/><text x="348" y="${ly + 2.2}" font-size="2.8" font-family="sans-serif">우물천장 간접조명 LED</text>`;
+    g += `<text x="334" y="${30 + legend.length * 8 + 18}" font-size="2.6" fill="#333" font-family="sans-serif">조명 ${n}개 · 스위치/콘센트 위치는 현장 협의</text>`; }
+  // 전체 치수선
+  const dimY = (+Y(b.y1) + 8).toFixed(2), dimX = (+X(b.x0) - 8).toFixed(2);
+  g += `<g stroke="#111" stroke-width=".25" font-family="sans-serif"><line x1="${X(b.x0)}" y1="${dimY}" x2="${X(b.x1)}" y2="${dimY}"/><line x1="${X(b.x0)}" y1="${Y(b.y1)}" x2="${X(b.x0)}" y2="${dimY}"/><line x1="${X(b.x1)}" y1="${Y(b.y1)}" x2="${X(b.x1)}" y2="${dimY}"/><text x="${X((b.x0 + b.x1) / 2)}" y="${(+dimY - 1.2).toFixed(2)}" font-size="3.2" text-anchor="middle" stroke="none" fill="#111">${(W).toLocaleString()}</text>`;
+  g += `<line x1="${dimX}" y1="${Y(b.y0)}" x2="${dimX}" y2="${Y(b.y1)}"/><line x1="${X(b.x0)}" y1="${Y(b.y0)}" x2="${dimX}" y2="${Y(b.y0)}"/><line x1="${X(b.x0)}" y1="${Y(b.y1)}" x2="${dimX}" y2="${Y(b.y1)}"/><text transform="translate(${(+dimX - 1.5).toFixed(2)} ${Y((b.y0 + b.y1) / 2)}) rotate(-90)" font-size="3.2" text-anchor="middle" stroke="none" fill="#111">${(Dp).toLocaleString()}</text></g>`;
+  // 표제란
+  const title = kind === "A" ? "A-101 평 면 도  FLOOR PLAN" : "E-101 전등·전열 설비 평면도  LIGHTING & POWER PLAN"; const today = new Date().toISOString().slice(0, 10); const area = polyArea(S.outline) / 1e6;
+  g += `<g font-family="sans-serif"><rect x="250" y="252" width="160" height="35" fill="#fff" stroke="#111" stroke-width=".6"/><line x1="250" y1="262" x2="410" y2="262" stroke="#111" stroke-width=".3"/><line x1="330" y1="262" x2="330" y2="287" stroke="#111" stroke-width=".3"/><text x="254" y="259" font-size="4.2" font-weight="700">${title}</text><text x="254" y="268" font-size="2.8">PROJECT: ${esc(S.projectName || "인테리어 계획안")}</text><text x="254" y="274" font-size="2.8">바닥면적 ${area.toFixed(1)} ㎡ (${(area / 3.3058).toFixed(1)}평) · 천장고 ${(S.ceilH / 1000).toFixed(2)} m</text><text x="254" y="280" font-size="2.8">벽: ${esc(WALLFIN[S.wallFin].n)} / 바닥: ${esc(FLOORS[S.floor].n)} / 문 ${S.walls.reduce((m, w) => m + w.ops.filter(o => o.t === "door").length, 0)} · 창 ${S.walls.reduce((m, w) => m + w.ops.filter(o => o.t === "window").length, 0)}</text><text x="334" y="268" font-size="2.8">SCALE 1 : ${scaleDen}</text><text x="334" y="274" font-size="2.8">DATE ${today}</text><text x="334" y="280" font-size="2.8">SHEET ${kind === "A" ? "A-101" : "E-101"}</text><text x="334" y="285.5" font-size="2.4" fill="#555">뚝딱 인테리어 · 계획 단계 도면(시공 전 실측 필요)</text></g>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 297" width="1680" height="1188" style="background:#fff">${g}</svg>`;
+}
+async function svgToPng(svg, w = 3360, h = 2376) { const blob = new Blob([svg], {type: "image/svg+xml"}); const url = URL.createObjectURL(blob); try { const im = await loadImage(url); const cv = document.createElement("canvas"); cv.width = w; cv.height = h; const g = cv.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0, 0, w, h); g.drawImage(im, 0, 0, w, h); return cv.toDataURL("image/png"); } finally { URL.revokeObjectURL(url); } }
+function showSheets() {
+  const modal = el("div", {class: "modal"}); const box_ = el("div", {class: "box", style: "max-width:1100px"}); modal.append(box_); document.body.append(modal); let kind = "A";
+  const render = () => { box_.innerHTML = ""; const svg = sheetSVG(kind); const holder = el("div", {class: "sheet", html: svg});
+    box_.append(el("div", {class: "row"}, el("h2", {style: "margin:0;font-size:18px", class: "grow"}, "시공 도면"), el("button", {class: "btn sm" + (kind === "A" ? " on" : ""), onclick: () => { kind = "A"; render(); }}, "A-101 평면도"), el("button", {class: "btn sm" + (kind === "E" ? " on" : ""), onclick: () => { kind = "E"; render(); }}, "E-101 전등·전열도")), holder,
+      el("p", {class: "hint"}, "그린 평면에서 바로 뽑은 계획 도면입니다. 벽 두께·치수·개구부·실명·면적·조명 기호·범례·표제란이 들어 있고, 시공사는 이 도면과 JSON 데이터로 실측·시공도를 만듭니다."),
+      el("div", {class: "row"}, el("button", {class: "btn primary", onclick: async () => { try { const png = await svgToPng(svg); if (downloads) await downloads.save({filename: (kind === "A" ? "A-101_plan" : "E-101_lighting") + ".png", data: await (await fetch(png)).blob()}); else setStatus("이 화면에서는 저장을 지원하지 않습니다."); } catch (e) { setStatus("저장이 취소되었거나 실패했습니다."); } }}, "PNG 저장 (A3 300dpi)"), el("span", {class: "grow"}), el("button", {class: "btn ghost", onclick: () => modal.remove()}, "닫기"))); };
+  render();
+}
+function scaleAll(k) { const sc = (v) => Math.round(v * k); S.outline.forEach(q => { q.x = sc(q.x); q.y = sc(q.y); }); S.walls.forEach(w => { w.x1 = sc(w.x1); w.y1 = sc(w.y1); w.x2 = sc(w.x2); w.y2 = sc(w.y2); w.ops.forEach(o => { o.at = Math.round(o.at * k); }); }); S.rooms.forEach(r => r.pts.forEach(q => { q.x = sc(q.x); q.y = sc(q.y); })); S.items.forEach(i => { i.x = sc(i.x); i.y = sc(i.y); }); S.photoScale *= k; S.photoX = sc(S.photoX); S.photoY = sc(S.photoY); S.cam.x = sc(S.cam.x); S.cam.y = sc(S.cam.y); }
+// ---- 이미지 유틸: 축소, 배경 제거(모서리 색 기준 채우기), 컷아웃 캐시 ----
+const _imgCache = {};
+function cutoutImg(it) { if (!it.img) return null; let im = _imgCache[it.id]; if (!im) { im = new Image(); im.onload = () => { draw2d(); }; im.src = it.img; _imgCache[it.id] = im; } return im; }
+function loadImage(src) { return new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = rej; im.src = src; }); }
+function fileToDataURL(f) { return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(f); }); }
+async function shrink(dataURL, max) { const im = await loadImage(dataURL); const k = Math.min(1, max / Math.max(im.width, im.height)); const cv = document.createElement("canvas"); cv.width = Math.round(im.width * k); cv.height = Math.round(im.height * k); cv.getContext("2d").drawImage(im, 0, 0, cv.width, cv.height); return cv; }
+// 배경 제거: 네 모서리 색이 비슷하면(제품 사진처럼 단색 배경) 모서리에서 번져 가며 비슷한 색을 투명 처리
+function removeBackground(cv, tol = 42) { const w = cv.width, h = cv.height, g = cv.getContext("2d"), id = g.getImageData(0, 0, w, h), d = id.data; const px = (x, y) => { const i = (y * w + x) * 4; return [d[i], d[i + 1], d[i + 2]]; }; const corners = [px(0, 0), px(w - 1, 0), px(0, h - 1), px(w - 1, h - 1)]; const avg = [0, 1, 2].map(c => corners.reduce((m, q) => m + q[c], 0) / 4); const spread = Math.max(...corners.map(q => Math.hypot(q[0] - avg[0], q[1] - avg[1], q[2] - avg[2]))); if (spread > 60) return {cv, removed: false}; const seen = new Uint8Array(w * h); const stack = [[0, 0], [w - 1, 0], [0, h - 1], [w - 1, h - 1]]; let n = 0; while (stack.length) { const [x, y] = stack.pop(); if (x < 0 || y < 0 || x >= w || y >= h) continue; const k = y * w + x; if (seen[k]) continue; seen[k] = 1; const i = k * 4; const dd = Math.hypot(d[i] - avg[0], d[i + 1] - avg[1], d[i + 2] - avg[2]); if (dd > tol) continue; d[i + 3] = 0; n++; stack.push([x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]); } if (n < w * h * 0.03) return {cv, removed: false}; // 가장자리 부드럽게
+  for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) { const i = (y * w + x) * 4; if (d[i + 3] === 0) continue; let z = 0; for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (d[((y + dy) * w + (x + dx)) * 4 + 3] === 0) z++; if (z) d[i + 3] = Math.round(255 * (1 - z / 5)); } g.putImageData(id, 0, 0); return {cv, removed: true}; }
+function trimAlpha(cv) { const w = cv.width, h = cv.height, d = cv.getContext("2d").getImageData(0, 0, w, h).data; let x0 = w, y0 = h, x1 = 0, y1 = 0; for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (d[(y * w + x) * 4 + 3] > 20) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; } if (x1 <= x0 || y1 <= y0) return cv; const out = document.createElement("canvas"); out.width = x1 - x0 + 1; out.height = y1 - y0 + 1; out.getContext("2d").drawImage(cv, x0, y0, out.width, out.height, 0, 0, out.width, out.height); return out; }
+// 사진 또는 동영상 파일 → 이미지 dataURL (동영상이면 장면을 골라 한 장으로)
+function pickImage(file) { if (!file) return Promise.resolve(null); if (!/^video\//.test(file.type)) return fileToDataURL(file); return new Promise((resolve) => { const url = URL.createObjectURL(file); const v = document.createElement("video"); v.src = url; v.muted = true; v.playsInline = true; v.preload = "auto"; v.setAttribute("playsinline", ""); v.style.cssText = "width:100%;border-radius:4px;background:#000;max-height:50vh"; const range = el("input", {type: "range", min: "0", max: "1000", value: "0", style: "width:100%"}); const modal = el("div", {class: "modal"}); const done = (val) => { modal.remove(); URL.revokeObjectURL(url); resolve(val); }; const use = el("button", {class: "btn primary", onclick: () => { if (!v.videoWidth) return; const cv = document.createElement("canvas"); const k = Math.min(1, 1600 / Math.max(v.videoWidth, v.videoHeight)); cv.width = Math.round(v.videoWidth * k); cv.height = Math.round(v.videoHeight * k); cv.getContext("2d").drawImage(v, 0, 0, cv.width, cv.height); done(cv.toDataURL("image/jpeg", .9)); }}, "이 장면 사용"); range.addEventListener("input", () => { if (v.duration) v.currentTime = v.duration * range.value / 1000; }); v.addEventListener("loadedmetadata", () => { v.currentTime = Math.min(0.5, v.duration / 2); }); modal.append(el("div", {class: "box", style: "max-width:720px"}, el("h2", {style: "margin:0;font-size:17px"}, "동영상에서 장면 고르기"), v, range, el("p", {class: "hint"}, "슬라이더로 원하는 장면을 찾은 뒤 ‘이 장면 사용’을 누르세요. 방 전체가 잘 보이는 장면이 좋습니다."), el("div", {class: "row"}, use, el("span", {class: "grow"}), el("button", {class: "btn ghost", onclick: () => done(null)}, "취소")))); document.body.append(modal); }); }
+function useAsUnderlay(url, msg) { const im = new Image(); im.onload = () => { pushUndo(); S.photo = url; S.photoW = im.width; S.photoH = im.height; S.photoScale = Math.max(8000 / im.width, 6000 / im.height); S.photoX = 0; S.photoY = 0; S.outline = []; loadPhoto(); mode = "outline"; fit2d(); renderPanel(); if (msg) setStatus(msg); }; im.src = url; }
+const camInput = (id, onFile) => { const inp = el("input", {type: "file", accept: "image/*", capture: "environment", hidden: "", id}); inp.addEventListener("change", onFile); return inp; };
+// ---- Claude(sample) 연결: 가구 사진 인식, 방 사진 분석, 말로 수정 ----
+let ai = null, aiImages = false, aiReady = false;
+(async () => { try { ai = window.claude?.use ? await window.claude.use("sample") : null; if (ai) { const lim = await ai.limits().catch(() => null); aiImages = !!(lim && lim.images); } } catch (e) { ai = null; } aiReady = true; if (step === 0 || step === 3 || step === 4) renderPanel(); })();
+async function canvasBlob(cv) { return new Promise(r => cv.toBlob(r, "image/jpeg", .85)); }
+function aiCopy(e) { const c = e && e.code; if (c === "not_granted" || c === "sampling_disabled") return "이 화면에서 Claude 사용이 허용되지 않았습니다."; if (c === "rate_limited") return "요청이 많아 잠시 뒤 다시 시도해 주세요."; if (c === "image_rejected") return "이미지를 읽을 수 없습니다. 다른 사진으로 시도해 주세요."; if (c === "invalid_json") return "분석 결과를 해석하지 못했습니다. 다시 시도해 주세요."; if (c === "cancelled") return "중단했습니다."; return "분석 중 문제가 생겼습니다. 다시 시도해 주세요."; }
+// 가구 사진 → 컷아웃 항목
+async function addPhotoFurniture(file, opts = {}) {
+  const url = typeof file === "string" ? file : await fileToDataURL(file); let cv = await shrink(url, 640); const bg = removeBackground(cv); cv = bg.removed ? trimAlpha(bg.cv) : bg.cv;
+  let name = (typeof file === "string" ? "" : file.name).replace(/\.[^.]+$/, "").slice(0, 12) || "내 가구", wmm = 1000, hmm = Math.round(1000 * cv.height / cv.width);
+  if (ai && aiImages && !opts.noAI) { setStatus("Claude가 가구 종류와 크기를 추정하는 중…"); try { const blob = await canvasBlob(cv); const r = await ai.json("이 사진 속 가구(또는 소품) 한 점의 한국어 이름과 실제 크기를 추정해 JSON 하나로만 답하세요. 형식: {\"name\": \"3인 소파\", \"width_m\": 2.0, \"height_m\": 0.85}. width_m은 정면에서 본 가로 폭, height_m은 바닥에서의 높이(m).", {images: [blob], modelTier: "quick"}); if (r && Number(r.width_m) > 0.05) { wmm = Math.round(Number(r.width_m) * 1000); hmm = Math.round((Number(r.height_m) > 0.05 ? Number(r.height_m) : r.width_m * cv.height / cv.width) * 1000); } if (r && r.name) name = String(r.name).slice(0, 16); } catch (e) { setStatus(aiCopy(e)); } }
+  const b = bbox(); const it = {id: nid(), type: "photo", name, img: cv.toDataURL("image/png"), w: wmm, h: hmm, x: snap((b.x0 + b.x1) / 2, 50), y: snap((b.y0 + b.y1) / 2, 50), rot: 0, c: 5}; pushUndo(); S.items.push(it); sel = it; changed(); setStatus(`${name} (${(wmm / 1000).toFixed(1)} m) 을(를) 놓았습니다. ${bg.removed ? "배경을 지웠습니다." : "배경이 단색이 아니어서 그대로 두었습니다."} 끌어서 옮기세요.`);
+  return it;
+}
+// 방 사진 → 구조 추정 (Claude 비전)
+async function analyzeRoomPhoto(file) {
+  if (!(ai && aiImages)) { setStatus("AI 분석은 claude.ai 화면에서 Claude 사용을 허용했을 때만 됩니다. 대신 사진을 밑그림으로 깔아 그릴 수 있어요."); return null; }
+  const url = typeof file === "string" ? file : await fileToDataURL(file); const cv = await shrink(url, 1280); const blob = await canvasBlob(cv);
+  const modal = el("div", {class: "modal"}); const out = el("p", {style: "margin:0;color:var(--muted);white-space:pre-wrap;max-height:40vh;overflow:auto"}, "Claude가 사진을 보는 중…"); const ctl = new AbortController(); modal.append(el("div", {class: "box", style: "max-width:520px"}, el("h2", {style: "margin:0;font-size:17px"}, "방 사진 분석"), out, el("div", {class: "row"}, el("button", {class: "btn", onclick: () => { ctl.abort(); }}, "중단")))); document.body.append(modal);
+  const keys = Object.keys(ITEM).filter(k => !ITEM[k].light).join("|"); const lights = Object.keys(ITEM).filter(k => ITEM[k].light).join("|");
+  const prompt = `이 사진은 실내 공간(방) 한 곳을 찍은 것입니다. 사진 한 장에서 보이는 범위를 바탕으로 방 전체 구조를 합리적으로 추정해 아래 JSON 하나로만 답하세요(설명 문장 금지).
+{"width_m": 4.2, "depth_m": 3.6, "height_m": 2.4, "floor": "wood|grey|tile|carpet|concrete", "wallColor": "white|beige|grey|navy|green",
+ "openings": [{"wall": "N|E|S|W", "type": "door|window", "at_frac": 0.5, "width_m": 1.5}],
+ "items": [{"type": "${keys}|${lights}", "x_frac": 0.5, "y_frac": 0.8, "rot": 0}],
+ "summary": "한 문장 한국어 설명"}
+규칙: 카메라가 서 있는 쪽이 S(남쪽, 아래), 정면에 보이는 벽이 N(위). width_m은 좌우 폭, depth_m은 앞뒤 깊이. x_frac은 왼쪽 0 → 오른쪽 1, y_frac은 N벽 0 → S벽 1. items의 type은 목록에 있는 값만 사용하고 보이는 가구를 최대 12개까지. 조명이 보이면 조명도 넣으세요. 모르는 값은 합리적으로 추정하세요.`;
+  try { const r = await ai.json(prompt, {images: [blob], signal: ctl.signal, onText: ({text}) => { out.textContent = text.slice(-600); }});
+    modal.remove(); if (!r || !(Number(r.width_m) > 1)) { setStatus("분석 결과가 비어 있습니다. 다른 사진으로 시도해 주세요."); return null; }
+    pushUndo(); const W = Math.round(Number(r.width_m) * 1000), Dd = Math.round(Number(r.depth_m || r.width_m * 0.8) * 1000); S = emptyState(); S.started = true; S.roomPhoto = cv.toDataURL("image/jpeg", .85);
+    S.outline = [[0, 0], [W, 0], [W, Dd], [0, Dd]].map(([x, y]) => ({x, y})); rebuildOuter(); S.ceilH = Math.round(Math.min(3600, Math.max(2200, Number(r.height_m || 2.4) * 1000)) / 50) * 50;
+    if (FLOORS[r.floor]) S.floor = r.floor; if (WALLCOLORS[r.wallColor]) S.wallColor = r.wallColor;
+    const sideWall = {N: S.walls[0], E: S.walls[1], S: S.walls[2], W: S.walls[3]};
+    for (const o of (r.openings || []).slice(0, 8)) { const w = sideWall[o.wall]; if (!w) continue; const L = wlen(w), ow = Math.round(Math.min(L - 200, Math.max(600, Number(o.width_m || (o.type === "door" ? 0.9 : 1.5)) * 1000))); let at = Math.round(Math.max(0, Math.min(1, Number(o.at_frac ?? .5))) * L - ow / 2); at = Math.max(100, Math.min(L - ow - 100, at)); if (o.wall === "S" || o.wall === "W") at = L - at - ow; w.ops.push({id: nid(), t: o.type === "door" ? "door" : "window", at: snap(at, 50), w: ow}); }
+    for (const it of (r.items || []).slice(0, 14)) { const d = ITEM[it.type]; if (!d) continue; S.items.push({id: nid(), type: it.type, x: snap(Math.max(0, Math.min(1, Number(it.x_frac ?? .5))) * W, 50), y: snap(Math.max(0, Math.min(1, Number(it.y_frac ?? .5))) * Dd, 50), rot: Math.round((Number(it.rot) || 0) / 90) * 90, c: d.c, lum: d.lum}); }
+    S.cam = {x: Math.round(W / 2), y: Dd - 300, dir: -Math.PI / 2, h: 1500, fov: 75}; fit2d(); changed(); setStatus(`AI 추정: ${(W / 1000).toFixed(1)} × ${(Dd / 1000).toFixed(1)} m. ${r.summary || ""} 치수가 다르면 다음 단계에서 면적이나 벽 길이를 넣어 맞추세요.`); return r; }
+  catch (e) { modal.remove(); setStatus(aiCopy(e)); return null; }
+}
+// 말로 수정: 규칙으로 못 알아들으면 Claude에게 JSON 작업 목록을 받아 적용
+async function commandAI(text) {
+  const summary = {floor: S.floor, wallColor: S.wallColor, wallFin: S.wallFin, cove: S.cove, baseboard: S.baseboard, door: S.doorColor, selectedWall: !!selWall, night: S.night, walls: S.walls.length, items: S.items.map(i => i.type).reduce((m, t) => (m[t] = (m[t] || 0) + 1, m), {})};
+  const prompt = `당신은 인테리어 편집기의 명령 해석기입니다. 사용자의 한국어 요청을 아래 작업(JSON) 목록으로 바꾸세요. 답은 JSON 하나만.
+가능한 작업: {"op":"floor","value":"${Object.keys(FLOORS).join("|")}"}, {"op":"wallColor","value":"${Object.keys(WALLCOLORS).join("|")}"}, {"op":"wallFin","value":"${Object.keys(WALLFIN).join("|")}"}, {"op":"cove","value":true}, {"op":"baseboard","value":true}, {"op":"door","value":"wood|white|dark"}, {"op":"add","type":"<카탈로그 키>","count":1}, {"op":"remove","type":"<카탈로그 키>","count":1}, {"op":"lights","factor":1.3}, {"op":"night","value":true}, {"op":"glass"}(가장 긴 안쪽 벽을 유리로)
+카탈로그 키와 이름: ${Object.entries(ITEM).map(([k, v]) => k + "=" + v.n).join(", ")}
+현재 상태: ${JSON.stringify(summary)}
+형식: {"ops":[...], "reply":"사용자에게 보여줄 한 문장"}  이해할 수 없으면 ops를 빈 배열로 두고 reply에 이유를 쓰세요.
+요청: ${text}`;
+  const r = await ai.json(prompt, {modelTier: "quick", cache: false}); const ops = Array.isArray(r && r.ops) ? r.ops : []; let n = 0;
+  for (const o of ops) { if (o.op === "floor" && FLOORS[o.value]) { S.floor = o.value; S.rooms.forEach(rr => rr.fin = o.value); n++; } else if (o.op === "wallColor" && WALLCOLORS[o.value]) { if (selWall) selWall.col = o.value; else S.wallColor = o.value; n++; } else if (o.op === "wallFin" && WALLFIN[o.value]) { if (selWall) selWall.fin = o.value; else S.wallFin = o.value; n++; } else if (o.op === "cove") { S.cove = !!o.value; n++; } else if (o.op === "baseboard") { S.baseboard = !!o.value; n++; } else if (o.op === "door" && DOORCOLORS[o.value]) { S.doorColor = o.value; n++; } else if (o.op === "add" && ITEM[o.type]) { const c = Math.min(10, Number(o.count) || 1); for (let i = 0; i < c; i++) addItem(o.type, i * 600); n++; } else if (o.op === "remove" && ITEM[o.type]) { const c = Math.min(10, Number(o.count) || 1); for (let i = 0; i < c; i++) { const idx = S.items.map(x => x.type).lastIndexOf(o.type); if (idx >= 0) S.items.splice(idx, 1); } n++; } else if (o.op === "lights") { const f = Math.max(.3, Math.min(3, Number(o.factor) || 1)); S.items.forEach(i => { if (D(i).light) i.lum = Math.max(.2, Math.min(4, (i.lum ?? D(i).lum) * f)); }); n++; } else if (o.op === "night") { S.night = !!o.value; n++; } else if (o.op === "glass") { const w = S.walls.filter(x => !x.outer).sort((a, b) => wlen(b) - wlen(a))[0]; if (w) { w.kind = "glass"; n++; } } }
+  if (n) changed(); return (r && r.reply) ? String(r.reply) : (n ? "적용했습니다." : "이해하지 못했습니다.");
+}
+/* ============================ 사진 합성 (실사 미리보기) ============================ */
+let compMode = false, compSel = null, compDrag = null; const c4 = document.createElement("canvas"); c4.id = "c4"; c4.hidden = true; c4.style.cssText = "position:absolute;inset:0"; $("#stage").insertBefore(c4, $("#float")); const g4 = c4.getContext("2d"); let compBg = null; const compImgs = {};
+function compImg(l) { let im = compImgs[l.id]; if (!im) { im = new Image(); im.onload = drawComp; im.src = l.src; compImgs[l.id] = im; } return im; }
+function compFit() { const r = $("#stage").getBoundingClientRect(); const dpr = Math.min(2, devicePixelRatio || 1); c4.width = r.width * dpr; c4.height = r.height * dpr; g4.setTransform(dpr, 0, 0, dpr, 0, 0); if (!compBg) return {k: 1, ox: 0, oy: 0, w: r.width, h: r.height}; const k = Math.min(r.width / compBg.width, r.height / compBg.height); return {k, ox: (r.width - compBg.width * k) / 2, oy: (r.height - compBg.height * k) / 2, w: compBg.width * k, h: compBg.height * k}; }
+function drawComp() { if (!compMode) return; const f = compFit(); const r = $("#stage").getBoundingClientRect(); g4.clearRect(0, 0, r.width, r.height); if (!compBg) { g4.fillStyle = css("--muted"); g4.font = "14px " + css("--font"); g4.textAlign = "center"; g4.fillText("왼쪽에서 방 사진을 올리면 여기에 나타납니다.", r.width / 2, r.height / 2); return; } g4.drawImage(compBg, f.ox, f.oy, f.w, f.h); for (const l of S.comp.layers) { const im = compImg(l); if (!im.complete || !im.width) continue; const w = l.s * f.k, h = w * im.height / im.width; const x = f.ox + l.x * f.k, y = f.oy + l.y * f.k; g4.save(); g4.translate(x, y); if (l.flip) g4.scale(-1, 1); g4.shadowColor = "rgba(0,0,0,.35)"; g4.shadowBlur = 18 * f.k; g4.shadowOffsetY = 6 * f.k; g4.drawImage(im, -w / 2, -h, w, h); g4.restore(); if (l === compSel) { g4.strokeStyle = css("--accent"); g4.lineWidth = 2; g4.setLineDash([6, 4]); g4.strokeRect(x - w / 2, y - h, w, h); g4.setLineDash([]); } } }
+function compHit(px, py) { const f = compFit(); for (let i = S.comp.layers.length - 1; i >= 0; i--) { const l = S.comp.layers[i], im = compImg(l); if (!im.width) continue; const w = l.s * f.k, h = w * im.height / im.width; const x = f.ox + l.x * f.k, y = f.oy + l.y * f.k; if (px >= x - w / 2 && px <= x + w / 2 && py >= y - h && py <= y) return l; } return null; }
+c4.addEventListener("pointerdown", (e) => { const r = c4.getBoundingClientRect(); const px = e.clientX - r.left, py = e.clientY - r.top; const l = compHit(px, py); compSel = l; if (l) { const f = compFit(); compDrag = {l, dx: l.x - (px - f.ox) / f.k, dy: l.y - (py - f.oy) / f.k}; try { c4.setPointerCapture(e.pointerId); } catch (err) {} } drawComp(); renderPanel(); });
+const cp = new Map(); let cpD0 = 0, cpS0 = 1;
+c4.addEventListener("pointerdown", (e) => { cp.set(e.pointerId, {x: e.clientX, y: e.clientY}); if (cp.size === 2 && compSel) { const [a, b] = [...cp.values()]; cpD0 = Math.hypot(a.x - b.x, a.y - b.y) || 1; cpS0 = compSel.s; compDrag = null; } });
+c4.addEventListener("pointerup", (e) => { cp.delete(e.pointerId); }); c4.addEventListener("pointercancel", (e) => { cp.delete(e.pointerId); });
+c4.addEventListener("pointermove", (e) => { if (cp.has(e.pointerId)) cp.set(e.pointerId, {x: e.clientX, y: e.clientY}); if (cp.size === 2 && compSel) { const [a, b] = [...cp.values()]; compSel.s = cpS0 * (Math.hypot(a.x - b.x, a.y - b.y) || 1) / cpD0; drawComp(); return; } if (!compDrag) return; const r = c4.getBoundingClientRect(); const f = compFit(); compDrag.l.x = (e.clientX - r.left - f.ox) / f.k + compDrag.dx; compDrag.l.y = (e.clientY - r.top - f.oy) / f.k + compDrag.dy; drawComp(); });
+c4.addEventListener("pointerup", () => { if (compDrag) save(); compDrag = null; });
+c4.addEventListener("wheel", (e) => { if (!compSel) return; e.preventDefault(); compSel.s *= e.deltaY < 0 ? 1.06 : 1 / 1.06; drawComp(); save(); }, {passive: false});
+function showComp(on) { compMode = on; c4.hidden = !on; if (on) { c2.hidden = true; c3.hidden = true; view2d = false; if (S.roomPhoto && (!compBg || compBg.src !== S.roomPhoto)) { loadImage(S.roomPhoto).then(im => { compBg = im; drawComp(); }); } drawComp(); } renderFloat(); }
+async function compAddFromItem(it) { const im = cutoutImg(it); if (!im) return; const l = {id: nid(), src: it.img, x: compBg ? compBg.width / 2 : 400, y: compBg ? compBg.height * .8 : 400, s: compBg ? compBg.width * .3 : 300, flip: false}; S.comp.layers.push(l); compSel = l; drawComp(); save(); renderPanel(); }
+async function compAddFile(file) { const url = typeof file === "string" ? file : await fileToDataURL(file); let cv = await shrink(url, 900); const bg = removeBackground(cv); cv = bg.removed ? trimAlpha(bg.cv) : bg.cv; const l = {id: nid(), src: cv.toDataURL("image/png"), x: compBg ? compBg.width / 2 : 400, y: compBg ? compBg.height * .8 : 400, s: compBg ? compBg.width * .3 : 300, flip: false}; S.comp.layers.push(l); compSel = l; drawComp(); save(); renderPanel(); setStatus(bg.removed ? "배경을 지우고 올렸습니다. 끌어서 옮기고 휠로 크기를 조절하세요." : "배경이 단색이 아니라 그대로 올렸습니다."); }
+async function compExport() { if (!compBg) return; const cv = document.createElement("canvas"); cv.width = compBg.width; cv.height = compBg.height; const g = cv.getContext("2d"); g.drawImage(compBg, 0, 0); for (const l of S.comp.layers) { const im = compImg(l); if (!im.width) continue; const w = l.s, h = w * im.height / im.width; g.save(); g.translate(l.x, l.y); if (l.flip) g.scale(-1, 1); g.shadowColor = "rgba(0,0,0,.35)"; g.shadowBlur = 18; g.shadowOffsetY = 6; g.drawImage(im, -w / 2, -h, w, h); g.restore(); } const url = cv.toDataURL("image/png"); const modal = el("div", {class: "modal"}); const bSave = el("button", {class: "btn primary", onclick: async () => { if (!downloads) return; try { await downloads.save({filename: "room-composite.png", data: await (await fetch(url)).blob()}); } catch (e) { setStatus("저장이 취소되었거나 실패했습니다."); } }}, "PNG 저장"); if (!downloads) bSave.disabled = true; modal.append(el("div", {class: "box"}, el("h2", {style: "margin:0;font-size:18px"}, "합성 결과"), el("img", {src: url, alt: "합성 결과"}), el("div", {class: "row"}, bSave, el("span", {class: "grow"}), el("button", {class: "btn ghost", onclick: () => modal.remove()}, "닫기")))); document.body.append(modal); }
+
+/* ============================ 3D ============================ */
+const c3 = $("#c3"); let holoGrid, buildT0 = 0, spinT = 0; let renderer, scene, camera, controls, world, lightsGroup, hemi, sun, raycaster = new THREE.Raycaster(), floorPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), meshByItem = new Map(), texCache = {}, walk = false, drag3 = null;
+function init3d() {
+  renderer = new THREE.WebGLRenderer({canvas: c3, antialias: true, preserveDrawingBuffer: true}); renderer.setPixelRatio(Math.min(isMobile() ? 1.5 : 2, devicePixelRatio || 1)); renderer.outputEncoding = THREE.sRGBEncoding; renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.0; renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  scene = new THREE.Scene(); camera = new THREE.PerspectiveCamera(55, 1, 0.05, 500);
+  controls = new THREE.OrbitControls(camera, c3); controls.enableDamping = true; controls.dampingFactor = .08; controls.maxPolarAngle = Math.PI / 2 - 0.02;
+  hemi = new THREE.HemisphereLight(0xffffff, 0x8a8070, 1.0); scene.add(hemi);
+  sun = new THREE.DirectionalLight(0xfff1dd, 0.6); sun.position.set(30, 40, 20); scene.add(sun);
+  world = new THREE.Group(); lightsGroup = new THREE.Group(); scene.add(world, lightsGroup);
+  holoGrid = new THREE.GridHelper(80, 80, 0x5ed7ff, 0x1a3a4a); holoGrid.material.transparent = true; holoGrid.material.opacity = .35; holoGrid.position.y = -.01; scene.add(holoGrid);
+  c3.addEventListener("dblclick", on3dbl);
+  c3.addEventListener("pointerdown", on3down); c3.addEventListener("pointermove", on3move); c3.addEventListener("pointerup", on3up);
+  (function loop(now) { requestAnimationFrame(loop); if (view2d || compMode) return;
+    if (S.spin && !walk) { controls.autoRotate = true; controls.autoRotateSpeed = .8; } else controls.autoRotate = false;
+    controls.update();
+    // 세우기 애니메이션: 바닥에서 솟아오르듯 (0.9초)
+    if (buildT0) { const t = Math.min(1, (now - buildT0) / 900); const e = 1 - Math.pow(1 - t, 3); world.children.forEach((o, i) => { const d = Math.min(1, Math.max(0, (t * 1.35 - (i / Math.max(1, world.children.length)) * .35) / 1)); const ee = 1 - Math.pow(1 - d, 3); o.scale.y = Math.max(.001, ee); if (o.userData.item) o.position.y = (1 - ee) * .4; }); if (t >= 1) { buildT0 = 0; world.children.forEach(o => { o.scale.y = 1; if (o.userData.item) o.position.y = 0; }); } }
+    for (const m of meshByItem.values()) if (m.userData.billboard) m.rotation.y = Math.atan2(camera.position.x - m.position.x, camera.position.z - m.position.z);
+    if (holoGrid) holoGrid.material.opacity = S.holo ? .5 : (S.night ? .12 : .18);
+    renderer.render(scene, camera); })(performance.now());
+}
+function resize3d() { const r = $("#stage").getBoundingClientRect(); renderer.setSize(r.width, r.height, false); camera.aspect = r.width / r.height; camera.updateProjectionMatrix(); }
+function floorTex(key) { if (texCache[key]) return texCache[key]; const f = FLOORS[key]; const cv = document.createElement("canvas"); cv.width = cv.height = 512; const g = cv.getContext("2d"); g.fillStyle = f.c1; g.fillRect(0, 0, 512, 512); g.fillStyle = f.c2;
+  if (f.kind === "plank") { for (let row = 0; row < 8; row++) { const off = (row % 2) * 160; for (let x = -256; x < 512; x += 512) { g.globalAlpha = .55; g.fillRect(x + off + 2, row * 64 + 1, 508, 2); g.fillRect(x + off, row * 64, 1, 64); } for (let i = 0; i < 40; i++) { g.globalAlpha = .08 + Math.random() * .1; g.fillRect(Math.random() * 512, row * 64 + Math.random() * 60, 60 + Math.random() * 200, 1); } } }
+  else if (f.kind === "tile") { g.globalAlpha = .7; for (let i = 0; i <= 512; i += 128) { g.fillRect(i - 1, 0, 2, 512); g.fillRect(0, i - 1, 512, 2); } }
+  else if (f.kind === "marble") { g.globalAlpha = .9; for (let i = 0; i <= 512; i += 128) { g.fillRect(i - 1, 0, 2, 512); g.fillRect(0, i - 1, 512, 2); } g.strokeStyle = f.c2; for (let v = 0; v < 14; v++) { g.globalAlpha = .18 + Math.random() * .2; g.lineWidth = .6 + Math.random() * 1.2; g.beginPath(); let x = Math.random() * 512, y = Math.random() * 512; g.moveTo(x, y); for (let k = 0; k < 6; k++) { x += (Math.random() - .5) * 160; y += (Math.random() - .5) * 160; g.quadraticCurveTo(x + (Math.random() - .5) * 60, y + (Math.random() - .5) * 60, x, y); } g.stroke(); } }
+  else if (f.kind === "terrazzo") { for (let i = 0; i < 900; i++) { g.globalAlpha = .5 + Math.random() * .4; g.fillStyle = ["#8a8580", "#b9a58a", "#6d7a86", "#d9b7a0", "#3f3f44"][i % 5]; g.beginPath(); g.ellipse(Math.random() * 512, Math.random() * 512, 2 + Math.random() * 7, 2 + Math.random() * 5, Math.random() * 3, 0, 7); g.fill(); } }
+  else if (f.kind === "herring") { g.save(); g.translate(256, 256); g.rotate(Math.PI / 4); for (let i = -12; i < 12; i++) for (let j = -12; j < 12; j++) { if ((i + j) % 2) continue; g.fillStyle = Math.random() < .5 ? f.c1 : f.c2; g.globalAlpha = .9; g.fillRect(i * 64, j * 64, 62, 30); g.fillStyle = f.c2; g.globalAlpha = .6; g.fillRect(i * 64, j * 64 + 32, 30, 62); } g.restore(); }
+  else { for (let i = 0; i < 6000; i++) { g.globalAlpha = Math.random() * .25; g.fillRect(Math.random() * 512, Math.random() * 512, 2, 2); } }
+  const t = new THREE.CanvasTexture(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.encoding = THREE.sRGBEncoding; t.anisotropy = 8; texCache[key] = t; return t; }
+const _wallTex = {};
+function wallTex(fin, hex) { const key = fin + hex; if (_wallTex[key]) return _wallTex[key]; const cv = document.createElement("canvas"); cv.width = cv.height = 512; const g = cv.getContext("2d"); g.fillStyle = hex; g.fillRect(0, 0, 512, 512);
+  const shade = (a) => { g.fillStyle = a > 0 ? "rgba(255,255,255," + a + ")" : "rgba(0,0,0," + (-a) + ")"; };
+  if (fin === "wallpaper") { for (let x = 0; x < 512; x += 64) { shade(.08); g.fillRect(x, 0, 32, 512); } for (let i = 0; i < 4000; i++) { shade(Math.random() < .5 ? .05 : -.05); g.fillRect(Math.random() * 512, Math.random() * 512, 2, 2); } }
+  else if (fin === "tile") { for (let i = 0; i <= 512; i += 128) { shade(-.25); g.fillRect(i - 2, 0, 4, 512); g.fillRect(0, i - 2, 512, 4); } for (let i = 0; i < 16; i++) { shade(.06 * Math.random()); g.fillRect((i % 4) * 128, Math.floor(i / 4) * 128, 128, 128); } }
+  else if (fin === "wood") { for (let x = 0; x < 512; x += 51) { shade(-.35); g.fillRect(x, 0, 3, 512); shade(.05); g.fillRect(x + 3, 0, 20, 512); } for (let i = 0; i < 60; i++) { shade(-.08); g.fillRect(Math.random() * 512, Math.random() * 512, 1, 40 + Math.random() * 200); } }
+  else if (fin === "stone") { let y = 0; while (y < 512) { const h = 50 + Math.random() * 60; let x = -Math.random() * 100; while (x < 512) { const w = 90 + Math.random() * 120; shade((Math.random() - .5) * .18); g.fillRect(x, y, w, h); shade(-.3); g.fillRect(x + w - 3, y, 3, h); x += w; } shade(-.3); g.fillRect(0, y + h - 3, 512, 3); y += h; } }
+  else if (fin === "brick") { for (let row = 0; row < 16; row++) { const off = (row % 2) * 64; for (let x = -64; x < 512; x += 128) { shade((Math.random() - .5) * .16); g.fillRect(x + off + 3, row * 32 + 3, 122, 26); } shade(-.35); g.fillRect(0, row * 32, 512, 3); } }
+  else { for (let i = 0; i < 3000; i++) { shade(Math.random() < .5 ? .03 : -.03); g.fillRect(Math.random() * 512, Math.random() * 512, 2, 2); } }
+  const t = new THREE.CanvasTexture(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.encoding = THREE.sRGBEncoding; t.anisotropy = 8; _wallTex[key] = t; return t; }
+function wallMatFor(w) { const fin = w.fin || S.wallFin || "paint", col = WALLCOLORS[w.col || S.wallColor] || WALLCOLORS.white; const key = "wm_" + fin + col.c; if (!_wallTex[key]) _wallTex[key] = new THREE.MeshStandardMaterial({map: wallTex(fin, col.c), roughness: fin === "tile" ? .35 : (fin === "stone" ? .95 : .85)}); return _wallTex[key]; }
+// 텍스처 비율을 유지하는 박스(큰 면 기준 1.2 m 마다 반복)
+const box = box0;
+function tbox(w, h, d, mat, x, y, z) { const geo = new THREE.BoxGeometry(w, h, d); const uv = geo.attributes.uv; const dims = [[d, h], [d, h], [w, d], [w, d], [w, h], [w, h]]; for (let i = 0; i < uv.count; i++) { const f = Math.floor(i / 4); uv.setXY(i, uv.getX(i) * dims[f][0] / 1.2, uv.getY(i) * dims[f][1] / 1.2); } const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = true; m.receiveShadow = true; return m; }
+function shapeOf(pts, flip) { const sh = new THREE.Shape(); pts.forEach((p, i) => { const x = p.x / 1000, y = (flip ? 1 : -1) * p.y / 1000; i ? sh.lineTo(x, y) : sh.moveTo(x, y); }); sh.closePath(); return sh; }
+const M = (c, o) => new THREE.MeshStandardMaterial(Object.assign({color: c, roughness: .8, metalness: 0}, o || {}));
+function box0(w, h, d, mat, x, y, z) { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat); m.position.set(x, y, z); m.castShadow = true; m.receiveShadow = true; return m; }
+function rebuild3d() {
+  while (world.children.length) { const o = world.children.pop(); o.traverse(c => { if (c.geometry) c.geometry.dispose(); }); }
+  while (lightsGroup.children.length) lightsGroup.children.pop();
+  meshByItem.clear();
+  const H = S.ceilH / 1000, glassMat = new THREE.MeshPhysicalMaterial({color: 0xcfe6f2, transmission: .9, roughness: .05, thickness: .02, transparent: true, opacity: .45}), frameMat = M(0x3a3d42, {roughness: .5, metalness: .4}), doorMat = M((DOORCOLORS[S.doorColor] || DOORCOLORS.wood).c, {roughness: .6}), baseMat = M(S.doorColor === "dark" ? 0x3b3a3c : 0xf4f2ee, {roughness: .5});
+  // 바닥 + 천장
+  for (const room of floorPolys()) { const key = FLOORS[room.fin] ? room.fin : S.floor; const t = floorTex(key); const geo = new THREE.ShapeGeometry(shapeOf(room.pts, false)); const fl = new THREE.Mesh(geo, M(0xffffff, {map: t, roughness: key === "carpet" ? 1 : .35})); fl.rotation.x = -Math.PI / 2; fl.receiveShadow = true;
+    const uv = geo.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) / 2.4, uv.getY(i) / 2.4); // 1타일 = 2.4 m
+    world.add(fl);
+    const cg = new THREE.ShapeGeometry(shapeOf(room.pts, true)); const cl = new THREE.Mesh(cg, M(0xf4f3ef, {roughness: 1})); cl.rotation.x = Math.PI / 2; cl.position.y = H; world.add(cl);
+    if (S.cove) { // 우물천장: 둘레 단차 + LED 띠 + 보조 광원
+      const pts = room.pts, n = pts.length, cx = pts.reduce((m, q) => m + q.x, 0) / n / 1000, cz = pts.reduce((m, q) => m + q.y, 0) / n / 1000; const soff = M(0xf4f3ef, {roughness: 1}), led = new THREE.MeshStandardMaterial({color: 0xffffff, emissive: 0xffe3b8, emissiveIntensity: 3});
+      for (let i = 0; i < n; i++) { const a = pts[i], b = pts[(i + 1) % n]; const L = dist(a, b) / 1000; if (L < .9) continue; const ang = Math.atan2(b.y - a.y, b.x - a.x); const gg = new THREE.Group(); gg.position.set(a.x / 1000, 0, a.y / 1000); gg.rotation.y = -ang; const mx = (a.x + b.x) / 2000, mz = (a.y + b.y) / 2000; const inward = ((cx - mx) * -Math.sin(ang) + (cz - mz) * Math.cos(ang)) >= 0 ? 1 : -1; gg.add(box0(L, .12, .45, soff, L / 2, H - .06, inward * .225)); gg.add(box0(L - .5, .02, .02, led, L / 2, H - .03, inward * .46)); world.add(gg); }
+      const b = bbox(); for (const [fx, fz] of [[.25, .25], [.75, .25], [.25, .75], [.75, .75]]) { const pl = new THREE.PointLight(0xffe3b8, S.night ? .9 : .45, 9, 1.6); pl.position.set((b.x0 + (b.x1 - b.x0) * fx) / 1000, H - .1, (b.y0 + (b.y1 - b.y0) * fz) / 1000); lightsGroup.add(pl); } } }
+  // 벽
+  for (const w of S.walls) {
+    const L = wlen(w) / 1000; if (L < .01) continue; const th = (w.kind === "glass" ? .04 : (w.outer ? .2 : .15)); const ang = Math.atan2(w.y2 - w.y1, w.x2 - w.x1);
+    const g = new THREE.Group(); g.position.set(w.x1 / 1000, 0, w.y1 / 1000); g.rotation.y = -ang; g.userData.wall = w; world.add(g);
+    const mat = wallMatFor(w); const box = (bw, bh, bd, bm, bx, by, bz) => (bm === mat ? tbox : box0)(bw, bh, bd, bm, bx, by, bz);
+    if (S.baseboard && w.kind !== "glass") g.add(box0(L, .08, th + .02, baseMat, L / 2, .04, 0));
+    if (w === selWall && !view2d) g.add(box0(L + .04, H + .04, th + .06, new THREE.MeshBasicMaterial({color: 0xc8552b, wireframe: true}), L / 2, H / 2, 0));
+    if (w.kind === "glass") { g.add(box(L, H - .1, th, glassMat, L / 2, H / 2, 0)); g.add(box(L, .05, .06, frameMat, L / 2, .025, 0)); g.add(box(L, .05, .06, frameMat, L / 2, H - .025, 0)); for (let x = 0; x <= L + .01; x += Math.max(1, L / Math.max(1, Math.round(L / 1.2)))) g.add(box(.04, H, .06, frameMat, Math.min(x, L), H / 2, 0)); continue; }
+    const ops = w.ops.map(o => ({a: o.at / 1000, b: (o.at + o.w) / 1000, t: o.t})).sort((p, q) => p.a - q.a); let t = 0;
+    for (const o of ops) { if (o.a > t) g.add(box(o.a - t, H, th, mat, (t + o.a) / 2, H / 2, 0)); const head = o.t === "door" ? 2.1 : 2.3, sill = o.t === "door" ? 0 : .9; g.add(box(o.b - o.a, H - head, th, mat, (o.a + o.b) / 2, (H + head) / 2, 0)); if (sill > 0) g.add(box(o.b - o.a, sill, th, mat, (o.a + o.b) / 2, sill / 2, 0));
+      g.add(box(.05, head - sill, th + .02, frameMat, o.a + .025, (head + sill) / 2, 0)); g.add(box(.05, head - sill, th + .02, frameMat, o.b - .025, (head + sill) / 2, 0)); g.add(box(o.b - o.a, .05, th + .02, frameMat, (o.a + o.b) / 2, head - .025, 0));
+      if (o.t === "window") g.add(box(o.b - o.a - .1, head - sill - .1, .01, glassMat, (o.a + o.b) / 2, (head + sill) / 2, 0));
+      else { const dw = o.b - o.a - .1; const leaf = box(dw, head - .05, .04, doorMat, 0, (head - .05) / 2, 0); leaf.position.set(o.a + .05 + dw / 2 * Math.cos(1.2), (head - .05) / 2, th / 2 + dw / 2 * Math.sin(1.2)); leaf.rotation.y = -1.2; g.add(leaf); }
+      t = o.b; }
+    if (t < L) g.add(box(L - t, H, th, mat, (t + L) / 2, H / 2, 0));
+  }
+  // 가구·조명
+  for (const it of S.items) { const m = buildItem(it, H); if (!m) continue; m.position.set(it.x / 1000, 0, it.y / 1000); m.rotation.y = -it.rot * Math.PI / 180; m.userData.item = it; world.add(m); meshByItem.set(it.id, m); if (D(it).light) addLight(it, H); }
+  applyNight();
+  if (S.holo) applyHolo();
+  if (animateBuild) { buildT0 = performance.now(); animateBuild = false; }
+  updateReadout();
+}
+let animateBuild = false;
+const holoMat = new THREE.MeshBasicMaterial({color: 0x1b6f8c, transparent: true, opacity: .22, depthWrite: false, side: THREE.DoubleSide});
+const holoEdge = new THREE.LineBasicMaterial({color: 0x5ed7ff, transparent: true, opacity: .9});
+function applyHolo() { // 모든 면을 반투명 시안으로, 모서리는 빛나는 선으로
+  const toAdd = []; world.traverse(o => { if (o.isMesh && !o.userData.holoEdge) { o.material = holoMat; if (o.geometry && (o.geometry.type === "BoxGeometry" || o.geometry.type === "ShapeGeometry" || o.geometry.type === "PlaneGeometry")) { const eg = new THREE.EdgesGeometry(o.geometry, 25); const ln = new THREE.LineSegments(eg, holoEdge); ln.userData.holoEdge = true; toAdd.push([o, ln]); } } }); for (const [o, ln] of toAdd) o.add(ln); scene.background = new THREE.Color(0x04070c); hemi.intensity = 1.2; }
+function updateReadout() { const r = $("#readout"); if (!r) return; const area = S.outline.length >= 3 ? polyArea(S.outline) / 1e6 : 0; const nl = S.items.filter(i => D(i).light).length; const est = estimate(); r.innerHTML = ""; const line = (k, v) => r.append(el("div", {}, el("span", {}, k + " "), v)); line("AREA", `${area.toFixed(1)} ㎡ · ${(area / 3.3058).toFixed(1)} 평`); line("WALLS", `${S.walls.length} · 문/창 ${S.walls.reduce((n, w) => n + w.ops.length, 0)}`); line("ITEMS", `${S.items.length - nl} · 조명 ${nl}`); line("EST", est.total ? `₩ ${Math.round(est.total / 10000).toLocaleString()} 만` : "—"); line("CEIL", `${(S.ceilH / 1000).toFixed(2)} m`); }
+function buildItem(it, H) {
+  const d = D(it); if (!d) return null; const g = new THREE.Group(); const col = PALETTE[it.c ?? d.c]; const fab = M(col, {roughness: .95}), wood = M(0x9c7a58, {roughness: .55}), dark = M(0x2d2f33, {roughness: .5, metalness: .3}), white = M(0xf1efe9, {roughness: .4}), leaf = M(0x4f7d4a, {roughness: .9}), pot = M(0xe9e4dc, {roughness: .5});
+  const w = d.w / 1000, dd = d.d / 1000, h = d.h / 1000; const sel_ = it === sel;
+  switch (it.type) {
+    case "sofa": case "armchair": g.add(box(w, .42, dd, fab, 0, .21, 0)); g.add(box(w, .38, .22, fab, 0, .6, -dd / 2 + .11)); g.add(box(.2, .2, dd, fab, -w / 2 + .1, .52, 0)); g.add(box(.2, .2, dd, fab, w / 2 - .1, .52, 0)); break;
+    case "coffee": g.add(box(w, .03, dd, w > .9 ? wood : white, 0, h - .015, 0)); for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) g.add(box(.04, h - .03, .04, dark, sx * (w / 2 - .05), (h - .03) / 2, sz * (dd / 2 - .05))); break;
+    case "table": case "desk": case "nightstand": g.add(box(w, .04, dd, wood, 0, h - .02, 0)); for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) g.add(box(.05, h - .04, .05, it.type === "desk" ? dark : wood, sx * (w / 2 - .04), (h - .04) / 2, sz * (dd / 2 - .04))); if (it.type === "desk") { g.add(box(.55, .33, .03, dark, 0, h + .25, -.15)); g.add(box(.2, .08, .15, dark, 0, h + .04, -.15)); } break;
+    case "rtable": { const top = new THREE.Mesh(new THREE.CylinderGeometry(w / 2, w / 2, .04, 32), white); top.position.y = h - .02; top.castShadow = true; g.add(top); const leg = new THREE.Mesh(new THREE.CylinderGeometry(.05, .08, h - .04, 16), dark); leg.position.y = (h - .04) / 2; g.add(leg); break; }
+    case "chair": case "ochair": { const seatH = it.type === "ochair" ? .48 : .45; g.add(box(w, .05, dd, it.type === "ochair" ? fab : wood, 0, seatH, 0)); g.add(box(w, h - seatH - .05, .05, it.type === "ochair" ? fab : wood, 0, (h + seatH) / 2, -dd / 2 + .025)); if (it.type === "ochair") { const st = new THREE.Mesh(new THREE.CylinderGeometry(.03, .03, seatH, 8), dark); st.position.y = seatH / 2; g.add(st); const base = new THREE.Mesh(new THREE.CylinderGeometry(.3, .3, .03, 5), dark); base.position.y = .02; g.add(base); } else for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) g.add(box(.035, seatH, .035, wood, sx * (w / 2 - .03), seatH / 2, sz * (dd / 2 - .03))); break; }
+    case "rug": g.add(box(w, .012, dd, fab, 0, .006, 0)); break;
+    case "tvstand": g.add(box(w, h, dd, wood, 0, h / 2, 0)); g.add(box(1.25, .72, .03, dark, 0, h + .4, -.1)); break;
+    case "counter": g.add(box(w, h - .04, dd, white, 0, (h - .04) / 2, 0)); g.add(box(w + .1, .04, dd + .1, M(0xe6e2da, {roughness: .3}), 0, h - .02, 0)); break;
+    case "bench": g.add(box(w, .06, dd, wood, 0, h - .03, 0)); g.add(box(.06, h - .06, dd - .06, wood, -w / 2 + .08, (h - .06) / 2, 0)); g.add(box(.06, h - .06, dd - .06, wood, w / 2 - .08, (h - .06) / 2, 0)); break;
+    case "plant": { const p = new THREE.Mesh(new THREE.CylinderGeometry(.22, .17, .42, 20), pot); p.position.y = .21; p.castShadow = true; g.add(p); const st = new THREE.Mesh(new THREE.CylinderGeometry(.02, .025, .6, 8), M(0x4a3b2d)); st.position.y = .7; g.add(st); for (const [x, y, z, r] of [[0, 1.15, 0, .3], [.17, .98, .1, .2], [-.15, 1.02, -.12, .19], [.05, 1.3, -.18, .16]]) { const s = new THREE.Mesh(new THREE.SphereGeometry(r, 14, 10), leaf); s.position.set(x, y, z); s.castShadow = true; g.add(s); } break; }
+    case "shelf": g.add(box(w, h, .03, wood, 0, h / 2, -dd / 2 + .015)); g.add(box(.03, h, dd, wood, -w / 2 + .015, h / 2, 0)); g.add(box(.03, h, dd, wood, w / 2 - .015, h / 2, 0)); for (let y = .03; y < h; y += (h - .06) / 4) g.add(box(w, .025, dd, wood, 0, y, 0)); for (let y = .33; y < h - .2; y += (h - .06) / 4) g.add(box(w - .1 - Math.random() * .3, .22, dd - .1, M(PALETTE[(it.c ?? 1) % 6 === 1 ? 3 : 1], {roughness: .9}), -.05, y + .12, 0)); break;
+    case "builtin": { const hh = (S.ceilH / 1000) - .02; const body = M(PALETTE[it.c ?? 5], {roughness: .45}); g.add(box(w, hh, dd, body, 0, hh / 2, 0)); const doors = Math.max(2, Math.round(w / .6)); for (let i = 1; i < doors; i++) g.add(box(.008, hh - .1, .01, dark, -w / 2 + i * (w / doors), hh / 2, dd / 2)); for (let i = 0; i < doors; i++) g.add(box(.02, .25, .02, dark, -w / 2 + (i + .5) * (w / doors) + (i % 2 ? -.05 : .05), 1.0, dd / 2 + .01)); break; }
+    case "base": { const body = M(PALETTE[it.c ?? 5], {roughness: .45}); g.add(box(w, h - .04, dd, body, 0, (h - .04) / 2, 0)); g.add(box(w + .02, .04, dd + .03, M(0xe9e5dd, {roughness: .3}), 0, h - .02, 0)); const doors = Math.max(2, Math.round(w / .6)); for (let i = 1; i < doors; i++) g.add(box(.008, h - .16, .01, dark, -w / 2 + i * (w / doors), (h - .04) / 2, dd / 2)); const sink = new THREE.Mesh(new THREE.BoxGeometry(.6, .02, .4), M(0xc9ccd0, {metalness: .7, roughness: .3})); sink.position.set(0, h - .005, 0); g.add(sink); break; }
+    case "upper": { const z0 = (d.z || 1450) / 1000; const body = M(PALETTE[it.c ?? 5], {roughness: .45}); g.add(box(w, h, dd, body, 0, z0 + h / 2, 0)); const doors = Math.max(2, Math.round(w / .6)); for (let i = 1; i < doors; i++) g.add(box(.008, h - .06, .01, dark, -w / 2 + i * (w / doors), z0 + h / 2, dd / 2)); g.add(box(w - .02, .025, .025, new THREE.MeshStandardMaterial({color: 0xffffff, emissive: 0xfff0d8, emissiveIntensity: 1.8}), 0, z0 - .012, dd / 2 - .05)); break; }
+    case "sign": { const z0 = (d.z || 2000) / 1000; g.add(box(w, h, dd, M(PALETTE[it.c ?? 3], {roughness: .4}), 0, z0 + h / 2, 0)); g.add(box(w * .7, h * .36, .01, new THREE.MeshStandardMaterial({color: 0xffffff, emissive: 0xfff2d0, emissiveIntensity: 1.6}), 0, z0 + h / 2, dd / 2 + .005)); break; }
+    case "mirror": g.add(box(w, h, dd, new THREE.MeshStandardMaterial({color: 0xdfe8ee, metalness: 1, roughness: .05}), 0, h / 2, 0)); g.add(box(w + .04, .04, dd + .02, dark, 0, h + .02, 0)); break;
+    case "speaker": g.add(box(.05, 1.1, .05, dark, 0, .55, 0)); g.add(box(.5, .05, .5, dark, 0, .025, 0)); g.add(box(w, .7, dd, M(0x1f2124, {roughness: .7}), 0, 1.45, 0)); g.add(box(w - .06, .64, .01, M(0x33363b, {roughness: 1}), 0, 1.45, dd / 2)); break;
+    case "stage": g.add(box(w, h, dd, M(0x9c7a58, {roughness: .5}), 0, h / 2, 0)); g.add(box(w, .02, .02, new THREE.MeshStandardMaterial({color: 0xffffff, emissive: 0xaee6ff, emissiveIntensity: 2}), 0, h - .01, dd / 2 - .01)); break;
+    case "display": g.add(box(w, .03, dd, wood, 0, .03, 0)); for (let y = .45; y < h; y += .45) g.add(box(w, .03, dd, wood, 0, y, 0)); g.add(box(.03, h, dd, wood, -w / 2 + .015, h / 2, 0)); g.add(box(.03, h, dd, wood, w / 2 - .015, h / 2, 0)); g.add(box(w, h, .02, wood, 0, h / 2, -dd / 2 + .01)); break;
+    case "hanger": g.add(box(.03, h, .03, dark, -w / 2 + .05, h / 2, 0)); g.add(box(.03, h, .03, dark, w / 2 - .05, h / 2, 0)); g.add(box(w, .03, .03, dark, 0, h - .02, 0)); for (let x = -w / 2 + .12; x < w / 2 - .1; x += .11) g.add(box(.08, .9, .25, M(PALETTE[(Math.round(x * 100) % 6 + 6) % 6], {roughness: .95}), x, h - .5, 0)); break;
+    case "barstool": { const st = new THREE.Mesh(new THREE.CylinderGeometry(.17, .17, .05, 20), fab); st.position.y = h - .025; g.add(st); const pole = new THREE.Mesh(new THREE.CylinderGeometry(.02, .02, h - .05, 8), dark); pole.position.y = (h - .05) / 2; g.add(pole); const base = new THREE.Mesh(new THREE.CylinderGeometry(.2, .2, .02, 20), dark); base.position.y = .01; g.add(base); break; }
+    case "waitseat": for (let i = 0; i < 3; i++) { const x = -w / 2 + (i + .5) * (w / 3); g.add(box(w / 3 - .04, .06, dd * .8, fab, x, .45, 0)); g.add(box(w / 3 - .04, .4, .05, fab, x, .7, -dd / 2 + .05)); } g.add(box(w, .04, .04, dark, 0, .4, 0)); g.add(box(.04, .4, dd * .6, dark, -w / 2 + .05, .2, 0)); g.add(box(.04, .4, dd * .6, dark, w / 2 - .05, .2, 0)); break;
+    case "cafetable": { const top = new THREE.Mesh(new THREE.CylinderGeometry(w / 2, w / 2, .03, 24), white); top.position.y = h - .015; g.add(top); const leg = new THREE.Mesh(new THREE.CylinderGeometry(.03, .03, h - .03, 10), dark); leg.position.y = (h - .03) / 2; g.add(leg); const base = new THREE.Mesh(new THREE.CylinderGeometry(.22, .22, .02, 24), dark); base.position.y = .01; g.add(base); break; }
+    case "lockerrow": { const n = Math.max(2, Math.round(w / .4)); for (let i = 0; i < n; i++) g.add(box(w / n - .01, h, dd, M(PALETTE[i % 2 ? 5 : 0], {roughness: .5}), -w / 2 + (i + .5) * (w / n), h / 2, 0)); break; }
+    case "cabinet": case "wardrobe": case "locker": g.add(box(w, h, dd, it.type === "locker" ? fab : (it.type === "wardrobe" ? white : wood), 0, h / 2, 0)); for (let x = -w / 2 + w / 4; x < w / 2; x += w / 2) g.add(box(.02, .12, .02, dark, x, h * .55, dd / 2 + .01)); break;
+    case "bed": g.add(box(w, .25, dd, wood, 0, .125, 0)); g.add(box(w - .06, .22, dd - .1, white, 0, .36, .03)); g.add(box(w, .9, .06, fab, 0, .45, -dd / 2 + .03)); g.add(box(w - .3, .12, .5, fab, 0, .53, -dd / 2 + .4)); break;
+    case "partition": g.add(box(w, h, dd, fab, 0, h / 2, 0)); break;
+    case "floorlamp": { const b = new THREE.Mesh(new THREE.CylinderGeometry(.14, .14, .02, 20), dark); b.position.y = .01; g.add(b); const p = new THREE.Mesh(new THREE.CylinderGeometry(.012, .012, 1.3, 8), dark); p.position.y = .66; g.add(p); const sh = new THREE.Mesh(new THREE.CylinderGeometry(.16, .2, .3, 20, 1, true), new THREE.MeshStandardMaterial({color: 0xf3e9d6, emissive: 0xffe2b0, emissiveIntensity: .8 * (it.lum ?? 1), side: THREE.DoubleSide})); sh.position.y = 1.45; g.add(sh); break; }
+    case "dl": case "spot": { const r = new THREE.Mesh(new THREE.CylinderGeometry(.06, .06, .02, 16), white); r.position.y = H - .01; g.add(r); const lens = new THREE.Mesh(new THREE.CylinderGeometry(.045, .045, .01, 16), new THREE.MeshStandardMaterial({color: 0xfff6e6, emissive: 0xffeecc, emissiveIntensity: 2 * (it.lum ?? 1)})); lens.position.y = H - .025; g.add(lens); if (it.type === "spot") { const cyl = new THREE.Mesh(new THREE.CylinderGeometry(.05, .05, .15, 16), dark); cyl.position.y = H - .1; g.add(cyl); } break; }
+    case "line": { const s = new THREE.Mesh(new THREE.BoxGeometry(w, .035, .06), new THREE.MeshStandardMaterial({color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 2.2 * (it.lum ?? 1)})); s.position.y = H - .02; g.add(s); break; }
+    case "pend": case "chand": { const drop = d.drop / 1000; const cord = new THREE.Mesh(new THREE.CylinderGeometry(.005, .005, drop, 6), dark); cord.position.y = H - drop / 2; g.add(cord); const brass = M(0xcfa865, {roughness: .3, metalness: .8}); if (it.type === "pend") { const sh = new THREE.Mesh(new THREE.CylinderGeometry(.12, .18, .22, 24, 1, true), new THREE.MeshStandardMaterial({color: 0xf1ece2, emissive: 0xffe6c0, emissiveIntensity: .9 * (it.lum ?? 1), side: THREE.DoubleSide})); sh.position.y = H - drop - .1; g.add(sh); } else { for (const [rad, dy] of [[.4, 0], [.27, .12], [.15, .24]]) { const ring = new THREE.Mesh(new THREE.TorusGeometry(rad, .012, 8, 40), brass); ring.rotation.x = Math.PI / 2; ring.position.y = H - drop + dy; g.add(ring); } let seed = 1; const rnd = () => (seed = (seed * 9301 + 49297) % 233280) / 233280; for (let i = 0; i < 16; i++) { const a = rnd() * 6.283, rad = .08 + rnd() * .34, dz = -.05 - rnd() * .45; const gl = new THREE.Mesh(new THREE.SphereGeometry(.04 + rnd() * .03, 12, 10), new THREE.MeshStandardMaterial({color: 0xffffff, emissive: 0xfff0d8, emissiveIntensity: 1.6 * (it.lum ?? 1), roughness: .2})); gl.position.set(Math.cos(a) * rad, H - drop + dz, Math.sin(a) * rad); g.add(gl); } } break; }
+    case "wl": { g.add(box(.08, .3, .06, dark, 0, 1.8, -.03)); const sh = new THREE.Mesh(new THREE.CylinderGeometry(.06, .09, .14, 16, 1, true), new THREE.MeshStandardMaterial({color: 0xf1ece2, emissive: 0xffe6c0, emissiveIntensity: 1.2 * (it.lum ?? 1), side: THREE.DoubleSide})); sh.position.set(0, 1.95, .05); g.add(sh); break; }
+    case "photo": { const im = cutoutImg(it); const tex = new THREE.Texture(im && im.complete && im.width ? im : undefined); if (im && im.complete && im.width) { tex.needsUpdate = true; } else if (im) { im.addEventListener("load", () => rebuild3d(), {once: true}); } tex.encoding = THREE.sRGBEncoding; const pl = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshStandardMaterial({map: tex, transparent: true, alphaTest: .35, side: THREE.DoubleSide, roughness: .9})); pl.position.y = h / 2; pl.castShadow = true; g.add(pl); g.userData.billboard = true; break; }
+    default: g.add(box(w, h, dd, fab, 0, h / 2, 0));
+  }
+  if (sel_) { const bb = new THREE.Box3().setFromObject(g); const sz = new THREE.Vector3(); bb.getSize(sz); const ring = new THREE.Mesh(new THREE.RingGeometry(Math.hypot(sz.x, sz.z) / 2 + .05, Math.hypot(sz.x, sz.z) / 2 + .09, 40), new THREE.MeshBasicMaterial({color: 0xc8552b, side: THREE.DoubleSide})); ring.rotation.x = -Math.PI / 2; ring.position.y = .015; g.add(ring); }
+  return g;
+}
+function addLight(it, H) { const d = D(it); const lum = it.lum ?? d.lum; const col = d.warm ? 0xffd9a8 : 0xfff4e4; let y = H - .05; if (d.drop) y = H - d.drop / 1000 - .15; if (d.stand) y = 1.45; if (d.wall) y = 1.9; const L = new THREE.PointLight(col, 0.9 * lum, 7 + lum * 2, 1.6); L.position.set(it.x / 1000, y, it.y / 1000); if (it.type === "spot") { const sp = new THREE.SpotLight(col, 1.4 * lum, 8, .5, .5, 1.2); sp.position.copy(L.position); const tg = new THREE.Object3D(); tg.position.set(it.x / 1000 + Math.sin(-it.rot * Math.PI / 180) * 0, 0, it.y / 1000 - 1.2); sp.target = tg; lightsGroup.add(tg, sp); return; } lightsGroup.add(L); }
+function applyNight() { if (S.holo) { scene.background = new THREE.Color(0x04070c); return; } const n = S.night; hemi.intensity = n ? .14 : .95; sun.intensity = n ? 0 : .55; renderer.toneMappingExposure = n ? 1.15 : 1.0; scene.background = new THREE.Color(n ? 0x0f1115 : 0xdfe6ee); }
+function zoomBy(k) { if (view2d) { const r = c2.getBoundingClientRect(); const px = r.width / 2, py = r.height / 2; autoFit = false; VZ.ox = px - (px - VZ.ox) * k; VZ.oy = py - (py - VZ.oy) * k; VZ.s *= k; draw2d(); } else if (compMode) { if (compSel) { compSel.s *= k; drawComp(); } } else { const dir = new THREE.Vector3().subVectors(camera.position, controls.target); dir.multiplyScalar(1 / k); camera.position.copy(controls.target).add(dir); controls.update(); } }
+function focusOn(target, radius) { // 홀로그램처럼 대상으로 부드럽게 다가가기
+  const from = camera.position.clone(), fromT = controls.target.clone(); const toT = target.clone(); const dir = new THREE.Vector3().subVectors(from, fromT).normalize(); const to = toT.clone().add(dir.multiplyScalar(Math.max(1.2, radius * 2.6))); const t0 = performance.now(); const step_ = (now) => { const t = Math.min(1, (now - t0) / 600), e = 1 - Math.pow(1 - t, 3); camera.position.lerpVectors(from, to, e); controls.target.lerpVectors(fromT, toT, e); controls.update(); if (t < 1) requestAnimationFrame(step_); }; requestAnimationFrame(step_); }
+function on3dbl(e) { const rc = pick3(e); const hits = rc.intersectObjects([...meshByItem.values()], true); if (hits.length) { let o = hits[0].object; while (o && !o.userData.item) o = o.parent; if (o) { const bb = new THREE.Box3().setFromObject(o); const c = new THREE.Vector3(), sz = new THREE.Vector3(); bb.getCenter(c); bb.getSize(sz); focusOn(c, sz.length() / 2); return; } } const hw = rc.intersectObjects(wallMeshes(), true); if (hw.length) { focusOn(hw[0].point, 1.5); return; } viewAerial(true); }
+let camPlaced = false;
+function viewAerial(animated) { camPlaced = true; walk = false; controls.enabled = true; controls.maxPolarAngle = Math.PI / 2 - .02; const b = bbox(); const cx = (b.x0 + b.x1) / 2000, cz = (b.y0 + b.y1) / 2000, R = Math.max(b.x1 - b.x0, b.y1 - b.y0) / 1000; camera.fov = 50; camera.updateProjectionMatrix(); const to = new THREE.Vector3(cx - R * .55, R * .85, cz + R * .9), toT = new THREE.Vector3(cx, .5, cz); if (animated) { const from = camera.position.clone(), fromT = controls.target.clone(); const t0 = performance.now(); const st = (now) => { const t = Math.min(1, (now - t0) / 700), e = 1 - Math.pow(1 - t, 3); camera.position.lerpVectors(from, to, e); controls.target.lerpVectors(fromT, toT, e); controls.update(); if (t < 1) requestAnimationFrame(st); }; requestAnimationFrame(st); } else { camera.position.copy(to); controls.target.copy(toT); controls.update(); } }
+function viewCam() { camPlaced = true; walk = true; controls.enabled = true; controls.maxPolarAngle = Math.PI - .05; camera.fov = S.cam.fov; camera.updateProjectionMatrix(); const h = S.cam.h / 1000; camera.position.set(S.cam.x / 1000, h, S.cam.y / 1000); controls.target.set(S.cam.x / 1000 + Math.cos(S.cam.dir) * 3, h - .15, S.cam.y / 1000 + Math.sin(S.cam.dir) * 3); controls.update(); }
+function placeCamAtCenter() { if (S.cam.x === 0 && S.cam.y === 0) { const b = bbox(); S.cam.x = b.x0 + (b.x1 - b.x0) * .15; S.cam.y = b.y0 + (b.y1 - b.y0) * .5; S.cam.dir = 0; } }
+function pick3(e) { const r = c3.getBoundingClientRect(); const m = new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1); raycaster.setFromCamera(m, camera); return raycaster; }
+const wallMeshes = () => world.children.filter(o => o.userData.wall);
+function on3down(e) { if (step === 2) { const rc = pick3(e); const hits = rc.intersectObjects(wallMeshes(), true); if (hits.length) { let o = hits[0].object; while (o && !o.userData.wall) o = o.parent; selWall = o ? o.userData.wall : null; } else selWall = null; rebuild3d(); renderPanel(); return; } if (step !== 3 && step !== 4) return; const rc = pick3(e); const hits = rc.intersectObjects([...meshByItem.values()], true); if (hits.length) { let o = hits[0].object; while (o && !o.userData.item) o = o.parent; if (o) { sel = o.userData.item; selWall = null; const p = new THREE.Vector3(); rc.ray.intersectPlane(floorPlane, p); drag3 = {it: sel, dx: sel.x - p.x * 1000, dy: sel.y - p.z * 1000, moved: false}; controls.enabled = false; pushUndo(); rebuild3d(); renderPanel(); try { c3.setPointerCapture(e.pointerId); } catch (err) {} return; } } if (walk && step === 4) { const p = new THREE.Vector3(); if (rc.ray.intersectPlane(floorPlane, p)) { drag3 = {walkTo: p}; } } }
+function on3move(e) { if (!drag3 || !drag3.it) return; const rc = pick3(e); const p = new THREE.Vector3(); if (!rc.ray.intersectPlane(floorPlane, p)) return; drag3.it.x = snap(p.x * 1000 + drag3.dx, 50); drag3.it.y = snap(p.z * 1000 + drag3.dy, 50); drag3.moved = true; snapWallItem(drag3.it); const m = meshByItem.get(drag3.it.id); if (m) { m.position.set(drag3.it.x / 1000, 0, drag3.it.y / 1000); m.rotation.y = -drag3.it.rot * Math.PI / 180; } }
+function on3up(e) { if (drag3 && drag3.it) { controls.enabled = true; if (!drag3.moved) undo.pop(); else { save(); rebuild3d(); } } drag3 = null; }
+function show3d(on) { compMode = false; c4.hidden = true; const was3d = !view2d; view2d = !on; c2.hidden = on; c3.hidden = !on; if (on) { if (!was3d) animateBuild = true; resize3d(); rebuild3d(); } else { resize2d(); draw2d(); } renderFloat(); }
+
+/* ============================ 투시도 렌더 ============================ */
+// 저장: claude.ai 안에서는 downloads 기능, 로컬 파일이나 일반 브라우저에서는 바로 다운로드
+function localSave({filename, data}) { const type = filename.endsWith(".json") ? "application/json" : filename.endsWith(".csv") ? "text/csv;charset=utf-8" : "application/octet-stream"; const blob = data instanceof Blob ? data : new Blob([filename.endsWith(".csv") ? "﻿" + data : data], {type}); const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = filename; document.body.append(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 3000); setStatus(filename + " 저장했습니다 (다운로드 폴더)."); }
+let downloads = null; (async () => { try { const r = window.claude?.use ? await window.claude.use("downloads") : null; downloads = r || (window.claude?.use ? null : {save: localSave}); } catch (e) { downloads = window.claude?.use ? null : {save: localSave}; } })();
+async function makeRender() {
+  const modal = el("div", {class: "modal"}); const prog = el("div", {class: "prog"}, el("i")); const info = el("p", {}, "투시도를 만드는 중입니다…"); const box_ = el("div", {class: "box"}, el("h2", {style: "margin:0;font-size:18px"}, "투시도"), info, prog); modal.append(box_); document.body.append(modal);
+  const steps_ = ["구조 정리", "재질 적용", "조명 계산", "그림자 계산", "마무리"]; for (let i = 0; i < steps_.length; i++) { await new Promise(r => setTimeout(r, 350)); prog.firstChild.style.width = ((i + 1) / steps_.length * 100) + "%"; info.textContent = steps_[i] + "…"; }
+  // 고품질 한 장: 1920×1080, 그림자 켬
+  const prevSize = new THREE.Vector2(); renderer.getSize(prevSize); const prevPR = renderer.getPixelRatio(); const prevAspect = camera.aspect;
+  const lights = lightsGroup.children.filter(l => l.isLight).sort((a, b) => a.position.distanceTo(camera.position) - b.position.distanceTo(camera.position)).slice(0, 6); lights.forEach(l => { l.castShadow = true; if (l.shadow) { l.shadow.mapSize.set(512, 512); l.shadow.bias = -.002; } }); sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048); sun.shadow.camera.left = -25; sun.shadow.camera.right = 25; sun.shadow.camera.top = 25; sun.shadow.camera.bottom = -25;
+  renderer.setPixelRatio(1); renderer.setSize(1920, 1080, false); camera.aspect = 1920 / 1080; camera.updateProjectionMatrix(); renderer.render(scene, camera);
+  const url = c3.toDataURL("image/png");
+  lights.forEach(l => l.castShadow = false); sun.castShadow = false; renderer.setPixelRatio(prevPR); renderer.setSize(prevSize.x, prevSize.y, false); camera.aspect = prevAspect; camera.updateProjectionMatrix();
+  box_.innerHTML = ""; const img = el("img", {src: url, alt: "투시도 미리보기"}); const note = el("p", {class: "hint"}, "이 화면은 브라우저가 즉시 그린 미리보기입니다. 정식 서비스에서는 같은 데이터를 서버에서 사진급 품질(Blender)로 렌더해 5~10분 뒤 전달합니다.");
+  const bSave = el("button", {class: "btn primary", onclick: async () => { if (!downloads) { setStatus("이 화면에서는 저장을 지원하지 않습니다. 이미지를 길게 눌러 저장하세요."); return; } try { const blob = await (await fetch(url)).blob(); await downloads.save({filename: "perspective.png", data: blob}); } catch (e) { setStatus("저장이 취소되었거나 실패했습니다."); } }}, "PNG 저장");
+  const bJson = el("button", {class: "btn", onclick: async () => { const data = JSON.stringify(exportPlan(), null, 1); if (!downloads) { try { await navigator.clipboard.writeText(data); setStatus("설계 데이터를 클립보드에 복사했습니다."); } catch (e) { setStatus("저장을 지원하지 않는 화면입니다."); } return; } try { await downloads.save({filename: "plan.json", data}); } catch (e) { setStatus("저장이 취소되었거나 실패했습니다."); } }}, "설계 데이터(JSON) 저장");
+  const bClose = el("button", {class: "btn ghost", onclick: () => modal.remove()}, "닫기");
+  box_.append(el("h2", {style: "margin:0;font-size:18px"}, "투시도 미리보기"), img, note, el("div", {class: "row"}, bSave, bJson, el("span", {class: "grow"}), bClose));
+  if (!downloads) { bSave.disabled = true; bSave.title = "이 화면에서는 파일 저장이 지원되지 않습니다"; }
+}
+// 기존 Blender 파이프라인(tool/make_blender.py)이 읽는 형식으로 변환
+function exportPlan() {
+  const walls = S.walls.map(w => ({id: w.id, x1: w.x1, y1: w.y1, x2: w.x2, y2: w.y2, type: w.kind === "glass" ? "fullglass" : (w.outer ? "ex" : "new"), core: false, fin: w.fin || S.wallFin, color: (WALLCOLORS[w.col || S.wallColor] || WALLCOLORS.white).c,
+    ops: w.ops.map(o => ({id: o.id, a: o.at, b: o.at + o.w, door: o.t === "door", glass: o.t === "window", sill: o.t === "door" ? 0 : 900, head: o.t === "door" ? 2100 : 2300, hinge: 0, swing: -1}))}));
+  const rooms = floorPolys().map((r, i) => ({id: r.id || "room" + i, name: r.name || "실" + (i + 1), fin: (FLOORS[r.fin] || FLOORS[S.floor]).fin, pts: r.pts.map(p => [p.x, p.y])}));
+  const fxMap = {dl: "dl", line: "line", pend: "pend", chand: "chand", wl: "wl", spot: "spot"};
+  const fixtures = S.items.filter(i => fxMap[i.type]).map(i => ({id: i.id, type: fxMap[i.type], x: i.x, y: i.y, rot: i.rot, c: "L1"}));
+  const furniture = S.items.filter(i => !D(i).light).map(i => ({id: i.id, type: i.type, name: D(i).n, w: D(i).w, d: D(i).d, h: D(i).h, x: i.x, y: i.y, rot: i.rot, color: PALETTE[i.c ?? D(i).c]}));
+  return {source: "easy-interior", project: S.projectName || "", estimate: estimate(), wallHeight: S.ceilH, walls, rooms, fixtures, furniture, wallColor: WALLCOLORS[S.wallColor].c, wallFin: S.wallFin, cove: S.cove, baseboard: S.baseboard, doorColor: S.doorColor, camera: {x: S.cam.x, y: S.cam.y, dir_deg: Math.round(S.cam.dir * 180 / Math.PI), h: S.cam.h, fov: S.cam.fov}};
+}
+
+/* ============================ 말로 수정 (데모) ============================ */
+const chatLog = [];
+function command(text) {
+  const t = text.replace(/\s+/g, "");
+  const floorKey = /헤링본/.test(t) ? "herring" : /월넛|호두|어두운나무|진한나무/.test(t) ? "walnut" : /대리석|마블/.test(t) ? "marble" : /테라조/.test(t) ? "terrazzo" : /회색|그레이/.test(t) ? "grey" : /타일/.test(t) ? "tile" : /카펫/.test(t) ? "carpet" : /콘크리트|시멘트/.test(t) ? "concrete" : /나무|마루|우드|원목|밝은/.test(t) ? "wood" : null;
+  const wallKey = /네이비|남색|파랑/.test(t) ? "navy" : /아이보리/.test(t) ? "ivory" : /베이지/.test(t) ? "beige" : /블러시|핑크|분홍/.test(t) ? "blush" : /차콜|진회색|검정/.test(t) ? "charcoal" : /회색|그레이/.test(t) ? "grey" : /초록|세이지|녹색/.test(t) ? "green" : /테라코타|주황|벽돌색/.test(t) ? "terracotta" : /머스터드|노랑|겨자/.test(t) ? "mustard" : /흰|화이트|백색/.test(t) ? "white" : null;
+  const finKey = /벽지|스트라이프|줄무늬/.test(t) ? "wallpaper" : /타일/.test(t) ? "tile" : /우드|나무|목재|패널/.test(t) ? "wood" : /돌|석재|스톤/.test(t) ? "stone" : /벽돌/.test(t) ? "brick" : /페인트|도장/.test(t) ? "paint" : null;
+  pushUndo();
+  if (/우물천장|간접조명|간접 조명/.test(t)) { S.cove = !/(없애|빼|끄)/.test(t); changed(); return S.cove ? "우물천장 간접조명을 넣었습니다." : "우물천장 간접조명을 뺐습니다."; }
+  if (/걸레받이|몰딩/.test(t)) { S.baseboard = !/(없애|빼)/.test(t); changed(); return S.baseboard ? "걸레받이를 넣었습니다." : "걸레받이를 뺐습니다."; }
+  if (/문/.test(t) && /(원목|나무|화이트|흰|다크|검)/.test(t) && !/벽/.test(t)) { S.doorColor = /(화이트|흰)/.test(t) ? "white" : /(다크|검)/.test(t) ? "dark" : "wood"; changed(); return `문을 ${DOORCOLORS[S.doorColor].n}(으)로 바꿨습니다.`; }
+  if (/벽/.test(t) && (finKey || wallKey) && !/바닥/.test(t)) { const target = (/(이|선택한|포인트|한쪽|한 쪽)벽|이 벽|선택/.test(t) && selWall) ? selWall : null; if (target) { if (finKey) target.fin = finKey; if (wallKey) target.col = wallKey; } else { if (finKey) S.wallFin = finKey; if (wallKey) S.wallColor = wallKey; S.walls.forEach(w => { if (finKey) delete w.fin; if (wallKey) delete w.col; }); } changed(); return `${target ? "선택한 벽" : "벽 전체"}을 ${finKey ? WALLFIN[finKey].n : ""}${finKey && wallKey ? " · " : ""}${wallKey ? WALLCOLORS[wallKey].n : ""}(으)로 바꿨습니다.`; }
+  if (/바닥|마루/.test(t) && floorKey) { S.floor = floorKey; S.rooms.forEach(r => r.fin = floorKey); changed(); return `바닥을 ${FLOORS[floorKey].n}(으)로 바꿨습니다.`; }
+  if (/벽/.test(t) && /유리|통유리/.test(t)) { const w = selWall || S.walls.filter(x => !x.outer).sort((a, b) => wlen(b) - wlen(a))[0]; if (!w) { undo.pop(); return "바꿀 벽이 없어요. 평면에서 벽을 먼저 선택해 주세요."; } w.kind = w.kind === "glass" ? "wall" : "glass"; changed(); return w.kind === "glass" ? "벽을 통유리로 바꿨습니다." : "유리벽을 일반 벽으로 되돌렸습니다."; }
+  if (/(조명|불|등)/.test(t) && /(밝|어둡|줄|키|올)/.test(t)) { const up = /밝|키|올/.test(t); let n = 0; S.items.forEach(i => { if (D(i).light) { i.lum = Math.max(.2, Math.min(4, (i.lum ?? D(i).lum) * (up ? 1.35 : .7))); n++; } }); if (!n) { undo.pop(); return "아직 놓인 조명이 없어요. 조명 탭에서 먼저 놓아 주세요."; } changed(); return `조명 ${n}개를 ${up ? "더 밝게" : "더 어둡게"} 했습니다.`; }
+  if (/밤|야간|저녁/.test(t)) { S.night = true; changed(); return "밤 분위기로 바꿨습니다. 놓인 조명이 어떻게 보이는지 확인하세요."; }
+  if (/낮|주간|아침/.test(t)) { S.night = false; changed(); return "낮 분위기로 바꿨습니다."; }
+  const found = Object.entries(ITEM).find(([k, v]) => t.includes(v.n.replace(/\s+/g, "")) || (k === "sofa" && /쇼파/.test(t)) || (k === "plant" && /식물|나무화분/.test(t)) || (k === "dl" && /다운라이트|천장등/.test(t)) || (k === "chair" && /의자/.test(t)) || (k === "table" && /테이블|식탁/.test(t)));
+  if (found) { const [k, v] = found; if (/지워|삭제|빼|없애/.test(t)) { const idx = S.items.map(i => i.type).lastIndexOf(k); if (idx < 0) { undo.pop(); return `${v.n}이(가) 없어요.`; } S.items.splice(idx, 1); changed(); return `${v.n} 하나를 지웠습니다.`; } const n = Math.min(10, parseInt((t.match(/(\d+)개/) || [])[1] || "1")); for (let i = 0; i < n; i++) addItem(k, i * 600); changed(); return `${v.n} ${n}개를 공간 가운데에 놓았습니다. 끌어서 옮기세요.`; }
+  undo.pop();
+  return "아직 이해하지 못하는 말이에요. 예: “바닥을 헤링본으로”, “벽을 벽지 베이지로”, “선택한 벽을 타일로”, “붙박이장 추가”, “우물천장 넣어줘”, “조명 더 밝게”, “밤으로”.";
+}
+function addItem(type, offset = 0) { const b = bbox(); const d = ITEM[type]; const it = {id: nid(), type, x: snap((b.x0 + b.x1) / 2 + offset, 50), y: snap((b.y0 + b.y1) / 2, 50), rot: 0, c: d.c, lum: d.lum}; if (step === 3 && !view2d && walk) { it.x = snap(camera.position.x * 1000 + Math.cos(S.cam.dir) * 2500, 50); it.y = snap(camera.position.z * 1000 + Math.sin(S.cam.dir) * 2500, 50); } S.items.push(it); sel = it; return it; }
+
+/* ============================ 패널(단계별 UI) ============================ */
+function renderSteps() { const n = $("#steps"); n.innerHTML = ""; STEPS.forEach((s, i) => n.append(el("button", {class: "step" + (i === step ? " on" : "") + (i < step ? " done" : ""), onclick: () => goStep(i)}, el("b", {}, String(i + 1)), s.n))); }
+function goStep(i) {
+  if (i > 0 && !S.started) { setStatus("먼저 공간을 만들어 주세요."); return; }
+  step = Math.max(0, Math.min(4, i)); pending = null; sel = null; selWall = null;
+  mode = step === 1 ? "size" : step === 4 ? "cam" : "select";
+  if (step === 2 || step === 3) { show3d(true); if (step === 2 || !camPlaced) viewAerial(); } else if (step === 4) { placeCamAtCenter(); show3d(false); fit2d(); } else { show3d(false); fit2d(); }
+  renderSteps(); renderPanel(); draw2d(); renderFloat();
+  if (isMobile()) { const a = $("#aside"); a.classList.toggle("collapsed", step === 2 || step === 4); a.classList.toggle("half", step === 3); setTimeout(() => { resize2d(); resize3d(); if (view2d && autoFit) fit2d(); draw2d(); }, 300); }
+  $("#btnPrev").disabled = step === 0; $("#btnNext").textContent = step === 4 ? (compMode ? "합성 이미지 만들기" : "투시도 만들기") : "다음";
+}
+function renderFloat() {
+  const f = $("#float"); f.innerHTML = "";
+  if (compMode) { f.append(el("button", {class: "btn sm", onclick: () => { show3d(false); fit2d(); renderPanel(); }}, "3D 투시도로")); return; }
+  if (!view2d) { f.append(el("button", {class: "btn sm" + (!walk ? " on" : ""), onclick: () => { viewAerial(); renderFloat(); }}, "위에서 보기"), el("button", {class: "btn sm" + (walk ? " on" : ""), onclick: () => { placeCamAtCenter(); viewCam(); renderFloat(); }}, "눈높이로 보기"), el("button", {class: "btn sm" + (S.night ? " on" : ""), onclick: () => { S.night = !S.night; applyNight(); save(); renderFloat(); }}, S.night ? "밤" : "낮"), el("button", {class: "btn sm" + (S.holo ? " on" : ""), title: "홀로그램 보기: 구조만 빛나는 선으로", onclick: () => { S.holo = !S.holo; save(); rebuild3d(); renderFloat(); }}, "홀로그램"), el("button", {class: "btn sm" + (S.spin ? " on" : ""), title: "천천히 자동 회전", onclick: () => { S.spin = !S.spin; save(); renderFloat(); }}, "회전")); if (step === 3 || step === 4) f.append(el("button", {class: "btn sm", onclick: () => { show3d(false); fit2d(); }}, "평면으로")); }
+  else { f.append(el("button", {class: "btn sm", onclick: () => { autoFit = true; fit2d(); draw2d(); }}, "화면 맞춤"), el("button", {class: "btn sm", onclick: doUndo, title: "Ctrl+Z"}, "되돌리기")); if (step >= 2) f.append(el("button", {class: "btn sm", onclick: () => { show3d(true); if (step === 4) viewCam(); }}, "3D로")); }
+}
+function renderPanel() {
+  const p = $("#panel"); p.innerHTML = "";
+  const H2 = (t) => el("h2", {}, t), P = (t, c) => el("p", {class: c || ""}, t);
+  if (step === 0) {
+    p.append(H2("공간 만들기"), P("편한 방법으로 시작하세요. 대충 그려도 됩니다. 치수와 정리는 다음 단계에서 합니다.", "lead"));
+    if (!S.started) {
+      const sketchHandler = async (e) => { const f = e.target.files[0]; e.target.value = ""; if (!f) return; const url = await pickImage(f); if (!url) return; useAsUnderlay(url, "사진 위에서 방 둘레를 따라 끌어 그리거나 모서리를 차례로 누르세요. 처음 점을 다시 누르면 완성됩니다."); };
+      const file = el("input", {type: "file", accept: "image/*,video/*", hidden: "", id: "photoIn"}); file.addEventListener("change", sketchHandler); const sketchCam = camInput("photoCam", sketchHandler);
+      const wIn = el("input", {type: "number", id: "rectW", value: "8", min: "1", step: "0.1"}), dIn = el("input", {type: "number", id: "rectD", value: "6", min: "1", step: "0.1"}), aIn = el("input", {type: "number", id: "rectA", value: "", min: "1", step: "0.5", placeholder: "예: 48"});
+      const roomHandler = async (e) => { const f = e.target.files[0]; e.target.value = ""; if (!f) return; const url = await pickImage(f); if (!url) return; const r = await analyzeRoomPhoto(url); if (!r) useAsUnderlay(url, "AI 분석 대신 사진을 밑그림으로 깔았습니다. 벽을 따라 끌어 그리세요."); };
+      const roomFile = el("input", {type: "file", accept: "image/*,video/*", hidden: "", id: "roomIn"}); roomFile.addEventListener("change", roomHandler); const roomCam = camInput("roomCam", roomHandler);
+      p.append(el("div", {class: "cards"},
+        el("div", {class: "card"}, el("b", {}, "내 방 사진·동영상으로 (AI 분석)"), el("div", {class: "row"}, el("button", {class: "btn sm primary", onclick: () => roomCam.click()}, "카메라로 바로 찍기"), el("button", {class: "btn sm", onclick: () => roomFile.click()}, "앨범·동영상에서 고르기")), el("span", {}, aiReady && !(ai && aiImages) ? "지금 화면에서는 AI 분석을 쓸 수 없어 사진이 밑그림으로만 깔립니다. claude.ai에서 열면 Claude가 구조를 추정합니다." : "방을 찍은 사진 한 장을 올리면 AI가 크기·문·창·가구를 추정해 3D로 세웁니다. 이 시제품은 claude.ai의 AI를 빌려 쓰고, 정식 버전은 자체 서버의 오픈소스 비전 모델로 동작합니다(Claude 불필요). 사진은 마지막 단계의 ‘사진 합성’에도 쓰입니다.")),
+        el("div", {class: "card"}, el("b", {}, "손으로 그린 평면 사진으로"), el("div", {class: "row"}, el("button", {class: "btn sm primary", onclick: () => sketchCam.click()}, "카메라로 바로 찍기"), el("button", {class: "btn sm", onclick: () => file.click()}, "앨범에서 고르기")), el("span", {}, "종이에 그린 그림이나 기존 도면을 찍어 올리면 밑그림으로 깔립니다. 벽을 따라 손가락으로 쭉 그리거나 모서리를 톡톡 누르세요.")),
+        el("div", {class: "card"}, el("b", {}, "크기만 넣고 시작"), el("span", {}, "가로·세로, 또는 바닥 면적만 넣어도 됩니다. 칸막이 벽은 다음에 끌어서 추가."), el("div", {class: "row"}, el("div", {class: "unit"}, wIn, "m"), "×", el("div", {class: "unit"}, dIn, "m"), el("button", {class: "btn sm primary", onclick: () => { const w = +wIn.value * 1000, d = +dIn.value * 1000; if (!(w > 500 && d > 500)) return; pushUndo(); S.outline = [[0, 0], [w, 0], [w, d], [0, d]].map(([x, y]) => ({x, y})); finishOutline(); fit2d(); draw2d(); }}, "만들기")), el("div", {class: "row"}, el("div", {class: "unit grow"}, aIn, "㎡"), el("span", {style: "color:var(--muted);font-size:12px"}, "(4:3 비율)"), el("button", {class: "btn sm", onclick: () => { const a = +aIn.value; if (!(a > 1)) return; const w = Math.round(Math.sqrt(a * 4 / 3) * 1000 / 50) * 50, d = Math.round(a * 1e6 / w / 50) * 50; pushUndo(); S.outline = [[0, 0], [w, 0], [w, d], [0, d]].map(([x, y]) => ({x, y})); finishOutline(); fit2d(); draw2d(); }}, "면적으로 만들기"))),
+        el("button", {class: "card", onclick: () => { S = sample4F(); loadPhoto(); fit2d(); changed(); setStatus("샘플: 4층 댄스 스튜디오(18 m × 17.8 m). 벽을 눌러 보거나 바로 다음 단계로."); }}, el("b", {}, "샘플 공간 열어 보기"), el("span", {}, "실제 프로젝트(4층 연습실)를 단순화한 예시. 가구와 조명까지 들어 있습니다.")),
+        el("button", {class: "card", onclick: () => { pushUndo(); S.outline = []; S.photo = null; photoImg = null; mode = "outline"; renderPanel(); setStatus("빈 화면에서 모서리를 차례로 누르세요. 1칸 = 1 m."); }}, el("b", {}, "빈 화면에 직접 그리기"), el("span", {}, "격자 위에서 모서리를 눌러 외곽을 만듭니다.")))
+      , file, roomFile, roomCam, sketchCam);
+      if (mode === "outline") p.append(el("div", {class: "hint"}, `방 둘레를 따라 손가락으로 쭉 끌어 그리면 됩니다(대충 그려도 직각으로 맞춰 줍니다). 또는 모서리를 톡톡 누르세요. 지금 모서리 ${S.outline.length}개. 처음 점을 다시 누르거나 Esc를 누르면 완성됩니다.`), el("div", {class: "row"}, el("button", {class: "btn sm", onclick: () => { if (S.outline.length) { S.outline.pop(); draw2d(); renderPanel(); } }}, "점 하나 취소"), el("button", {class: "btn sm primary", onclick: finishOutline, disabled: S.outline.length < 3 ? "" : null}, "외곽 완성")));
+      if (S.photo) p.append(el("div", {class: "field"}, el("label", {}, "밑그림 크기 (사진 가로 = 몇 m)"), el("input", {type: "range", min: "2", max: "60", step: "0.5", value: String(S.photoW * S.photoScale / 1000), oninput: (e) => { S.photoScale = e.target.value * 1000 / S.photoW; draw2d(); }})));
+      return;
+    }
+    const tool = (k, n, s) => el("button", {class: "btn" + (mode === k ? " on" : ""), onclick: () => { mode = k; pending = null; renderPanel(); setStatus(TIP[k]); }}, n, el("small", {}, s));
+    const TIP = {select: "벽이나 가구를 누르면 선택됩니다.", wall: "벽이 들어갈 자리를 끌어서 그리세요. 꺾어 그리면 벽 여러 개가 됩니다. 짧게 두 번 눌러도 됩니다.", rect: "끌어서 네모를 그리면 방(벽 네 개)이 생깁니다.", door: "문을 넣을 벽을 누르세요 (폭 0.9 m).", window: "창을 넣을 벽을 누르세요 (폭 1.5 m, 바닥에서 0.9 m).", glass: "통유리로 바꿀 벽을 누르세요. 다시 누르면 벽으로 돌아옵니다.", erase: "지울 벽이나 가구를 누르세요. 바깥 벽은 지울 수 없습니다.", pan: "끌어서 화면을 옮기고, 휠로 확대·축소합니다."};
+    p.append(el("div", {class: "tools"}, tool("select", "선택", "누르기"), tool("wall", "벽 그리기", "끌기"), tool("rect", "방 네모", "끌기"), tool("door", "문", "벽 누르기"), tool("window", "창", "벽 누르기"), tool("glass", "유리벽", "벽 누르기"), tool("erase", "지우기", "누르기")));
+    const area = polyArea(S.outline); p.append(el("div", {class: "stat"}, el("div", {}, el("small", {}, "바닥 면적"), el("b", {}, `${(area / 1e6).toFixed(1)} ㎡`), el("small", {}, `${(area / 3.3058e6).toFixed(1)} 평`)), el("div", {}, el("small", {}, "벽 / 문·창"), el("b", {}, `${S.walls.length} / ${S.walls.reduce((n, w) => n + w.ops.length, 0)}`))));
+    if (selWall) p.append(el("div", {class: "sel"}, el("div", {class: "name"}, `${selWall.outer ? "바깥 벽" : (selWall.kind === "glass" ? "유리벽" : "벽")} · ${(wlen(selWall) / 1000).toFixed(2)} m`), el("div", {class: "row"}, el("button", {class: "btn sm", onclick: () => { pushUndo(); selWall.kind = selWall.kind === "glass" ? "wall" : "glass"; changed(); }}, selWall.kind === "glass" ? "벽으로" : "유리로"), el("button", {class: "btn sm", onclick: () => { const L = wlen(selWall); if (L < 1200) return; pushUndo(); selWall.ops.push({id: nid(), t: "door", at: snap(L / 2 - 450, 50), w: 900}); changed(); }}, "문 넣기"), el("button", {class: "btn sm", onclick: () => { const L = wlen(selWall); if (L < 1800) return; pushUndo(); selWall.ops.push({id: nid(), t: "window", at: snap(L / 2 - 750, 50), w: 1500}); changed(); }}, "창 넣기"), selWall.ops.length ? el("button", {class: "btn sm", onclick: () => { pushUndo(); selWall.ops.pop(); changed(); }}, "문·창 하나 빼기") : null, !selWall.outer ? el("button", {class: "btn sm", onclick: () => { pushUndo(); S.walls = S.walls.filter(w => w !== selWall); selWall = null; changed(); }}, "삭제") : null), el("div", {class: "field"}, el("label", {}, "이 벽 마감·색 (포인트 벽)"), el("div", {class: "cats"}, ...Object.entries(WALLFIN).map(([k, f]) => el("button", {class: "btn sm" + ((selWall.fin || S.wallFin) === k ? " on" : ""), onclick: () => { pushUndo(); selWall.fin = k; changed(); }}, f.n))), el("div", {class: "row"}, ...Object.entries(WALLCOLORS).map(([k, w]) => el("button", {class: "sw" + ((selWall.col || S.wallColor) === k ? " on" : ""), style: "width:30px", title: w.n, onclick: () => { pushUndo(); selWall.col = k; changed(); }}, el("i", {style: `background:${w.c};height:22px;border-radius:8px`})))))));
+    p.append(el("div", {class: "row"}, el("button", {class: "btn sm", onclick: () => { pushUndo(); tidy(); changed(); }}, "지금 정리하기"), el("span", {style: "font-size:12px;color:var(--muted)"}, "삐뚠 선을 직각으로, 끊긴 곳을 연결")));
+    p.append(el("div", {class: "hint"}, "휠로 확대·축소, 빈 곳을 끌면 화면이 움직입니다. 실수했으면 Ctrl+Z 또는 ‘되돌리기’."));
+  }
+  if (step === 1) {
+    p.append(H2("치수·정리"), P("대충 그린 선을 정리하고, 아는 치수 하나로 전체 크기를 맞춥니다.", "lead"));
+    p.append(el("div", {class: "sel"}, el("div", {class: "name"}, "1. 선 정리"), el("p", {style: "font-size:13px"}, "삐뚠 벽을 직각·45도로 맞추고, 끊긴 모서리를 잇고, 살짝 어긋난 선을 한 줄로 정렬합니다."), el("div", {class: "row"}, el("button", {class: "btn sm primary", onclick: () => { pushUndo(); tidy(); changed(); }}, "정리하기"), el("button", {class: "btn sm", onclick: doUndo}, "되돌리기"))));
+    const areaIn = el("input", {type: "number", step: "0.1", min: "1", id: "areaIn", placeholder: (polyArea(S.outline) / 1e6).toFixed(1)});
+    p.append(el("div", {class: "sel"}, el("div", {class: "name"}, "2. 바닥 면적으로 맞추기"), el("div", {class: "row"}, el("div", {class: "unit grow"}, areaIn, "㎡"), el("button", {class: "btn sm primary", onclick: () => { const a = +areaIn.value; const cur = polyArea(S.outline); if (!(a > 0.5 && cur > 0)) return; const k = Math.sqrt(a * 1e6 / cur); pushUndo(); scaleAll(k); fit2d(); changed(); setStatus(`바닥 면적을 ${a} ㎡(${(a / 3.3058).toFixed(1)} 평)에 맞췄습니다.`); }}, "적용")), el("p", {style: "font-size:12px"}, "평수만 아시면 ㎡ = 평 × 3.3 으로 넣으세요. 또는 아래처럼 벽 길이 하나로 맞춰도 됩니다.")));
+    const area = polyArea(S.outline), b = bbox(); p.append(el("div", {class: "stat"}, el("div", {}, el("small", {}, "현재 크기"), el("b", {}, `${((b.x1 - b.x0) / 1000).toFixed(1)} × ${((b.y1 - b.y0) / 1000).toFixed(1)} m`)), el("div", {}, el("small", {}, "바닥 면적"), el("b", {}, `${(area / 1e6).toFixed(1)} ㎡`), el("small", {}, `${(area / 3.3058e6).toFixed(1)} 평`))));
+    if (selWall) { const inp = el("input", {type: "number", step: "0.01", min: "0.1", id: "refLen", value: (wlen(selWall) / 1000).toFixed(2)}); p.append(el("div", {class: "sel"}, el("div", {class: "name"}, "3. 선택한 벽의 실제 길이"), el("div", {class: "row"}, el("div", {class: "unit grow"}, inp, "m"), el("button", {class: "btn sm primary", onclick: () => { const target = +inp.value * 1000; const cur = wlen(selWall); if (!(target > 50 && cur > 0)) return; const k = target / cur; pushUndo(); scaleAll(k); fit2d(); changed(); setStatus(`전체를 ${k.toFixed(3)}배로 맞췄습니다.`); }}, "적용")))); }
+    else p.append(el("div", {class: "hint"}, "3. 또는 평면에서 길이를 아는 벽을 하나 누르세요. 벽마다 현재 길이가 표시되어 있습니다."));
+    const ch = el("input", {type: "range", min: "2200", max: "3600", step: "50", value: String(S.ceilH), id: "ceilH", oninput: (e) => { S.ceilH = +e.target.value; e.target.previousSibling.textContent = `천장 높이 ${(S.ceilH / 1000).toFixed(2)} m`; save(); }});
+    p.append(el("div", {class: "field"}, el("label", {}, `천장 높이 ${(S.ceilH / 1000).toFixed(2)} m`), ch));
+  }
+  if (step === 2) {
+    p.append(H2("3D로 보기 · 마감 고르기"), P("끌어서 돌리고, 휠로 당깁니다. 3D에서 벽을 누르면 그 벽만 따로 바꿀 수 있어요(포인트 벽).", "lead"));
+    const wallSw = (get, set) => el("div", {class: "swatches"}, ...Object.entries(WALLCOLORS).map(([k, w]) => el("button", {class: "sw" + (get() === k ? " on" : ""), onclick: () => { pushUndo(); set(k); changed(); }}, el("i", {style: `background:${w.c}`}), el("span", {}, w.n))));
+    const finSel = (get, set) => el("div", {class: "cats"}, ...Object.entries(WALLFIN).map(([k, f]) => el("button", {class: "btn sm" + (get() === k ? " on" : ""), onclick: () => { pushUndo(); set(k); changed(); }}, f.n)));
+    if (selWall) p.append(el("div", {class: "sel"}, el("div", {class: "row"}, el("div", {class: "name grow"}, `선택한 벽 · ${(wlen(selWall) / 1000).toFixed(1)} m`), el("button", {class: "btn sm ghost", onclick: () => { selWall = null; rebuild3d(); renderPanel(); }}, "선택 해제")), el("div", {class: "field"}, el("label", {}, "이 벽 마감"), finSel(() => selWall.fin || S.wallFin, (k) => selWall.fin = k)), el("div", {class: "field"}, el("label", {}, "이 벽 색"), wallSw(() => selWall.col || S.wallColor, (k) => selWall.col = k)), (selWall.fin || selWall.col) ? el("button", {class: "btn sm", onclick: () => { pushUndo(); delete selWall.fin; delete selWall.col; changed(); }}, "전체 설정으로 되돌리기") : null));
+    p.append(el("div", {class: "field"}, el("label", {}, "벽 마감 (전체)"), finSel(() => S.wallFin, (k) => S.wallFin = k)));
+    p.append(el("div", {class: "field"}, el("label", {}, "벽 색 (전체)"), wallSw(() => S.wallColor, (k) => S.wallColor = k)));
+    p.append(el("div", {class: "field"}, el("label", {}, "바닥"), el("div", {class: "swatches"}, ...Object.entries(FLOORS).map(([k, f]) => el("button", {class: "sw" + (S.floor === k ? " on" : ""), onclick: () => { pushUndo(); S.floor = k; S.rooms.forEach(r => r.fin = k); changed(); }}, el("i", {style: `background:${f.kind === "plank" ? `repeating-linear-gradient(90deg,${f.c1} 0 14px,${f.c2} 14px 16px)` : f.kind === "herring" ? `repeating-linear-gradient(45deg,${f.c1} 0 10px,${f.c2} 10px 12px)` : (f.kind === "tile" || f.kind === "marble") ? `repeating-linear-gradient(90deg,${f.c1} 0 16px,${f.c2} 16px 18px),repeating-linear-gradient(0deg,${f.c1} 0 16px,${f.c2} 16px 18px)` : f.kind === "terrazzo" ? `radial-gradient(${f.c2} 1px, transparent 2px) 0 0/8px 8px, ${f.c1}` : f.c1}`}), el("span", {}, f.n))))));
+    const tog = (label, get, set) => el("button", {class: "btn sm" + (get() ? " on" : ""), onclick: () => { pushUndo(); set(!get()); changed(); }}, label);
+    p.append(el("div", {class: "field"}, el("label", {}, "천장·마감재"), el("div", {class: "row"}, tog("우물천장 간접조명", () => S.cove, (v) => S.cove = v), tog("걸레받이", () => S.baseboard, (v) => S.baseboard = v))));
+    p.append(el("div", {class: "field"}, el("label", {}, "문 색"), el("div", {class: "cats"}, ...Object.entries(DOORCOLORS).map(([k, c]) => el("button", {class: "btn sm" + (S.doorColor === k ? " on" : ""), onclick: () => { pushUndo(); S.doorColor = k; changed(); }}, c.n)))));
+    p.append(el("div", {class: "hint"}, "천장은 위에서 볼 때만 투명하게 처리되어 안이 보입니다. 붙박이장·상하부장은 다음 단계 ‘수납·침실’에서 넣고 길이를 조절하세요."));
+  }
+  if (step === 3) {
+    p.append(H2("가구·조명 놓기"), P("목록에서 누르면 공간 가운데에 놓입니다. 3D나 평면에서 끌어서 옮기고, 선택한 뒤 돌리거나 지우세요. 수납장과 벽등은 벽 가까이 가면 자동으로 벽에 붙습니다.", "lead"));
+    renderPanel.cat = renderPanel.cat || "living";
+    p.append(el("div", {class: "cats"}, ...Object.entries(CAT).map(([k, c]) => el("button", {class: "btn sm" + (renderPanel.cat === k ? " on" : ""), onclick: () => { renderPanel.cat = k; renderPanel(); }}, c.n))));
+    const furnHandler = async (e) => { const f = e.target.files[0]; e.target.value = ""; if (!f) return; try { const url = await pickImage(f); if (!url) return; await addPhotoFurniture(url); } catch (err) { setStatus("이미지를 읽지 못했습니다."); } };
+    const furnFile = el("input", {type: "file", accept: "image/*,video/*", hidden: "", id: "furnIn"}); furnFile.addEventListener("change", furnHandler); const furnCam = camInput("furnCam", furnHandler);
+    p.append(el("div", {class: "card"}, el("b", {}, "내 가구 사진 넣기"), el("div", {class: "row"}, el("button", {class: "btn sm primary", onclick: () => furnCam.click()}, "카메라로 바로 찍기"), el("button", {class: "btn sm", onclick: () => furnFile.click()}, "앨범·동영상에서")), el("span", {}, (ai && aiImages) ? "사고 싶은 가구 사진이나 쇼핑몰 이미지를 올리면 배경을 지우고 Claude가 크기를 추정해 바로 세워 줍니다." : "사고 싶은 가구 사진이나 쇼핑몰 이미지를 올리면 배경을 지우고(단색 배경일 때) 1 m 폭으로 세웁니다. 크기는 선택 후 조절.")), furnFile, furnCam);
+    const c = CAT[renderPanel.cat]; p.append(el("div", {class: "catalog"}, ...Object.entries(c.items).map(([k, d]) => el("button", {class: "item", onclick: () => { pushUndo(); addItem(k); changed(); setStatus(`${d.n}을(를) 놓았습니다. 끌어서 옮기세요.`); }}, el("i", {style: `background:${d.light ? "radial-gradient(circle,#ffe9a8 0 35%,#f2c14e 36% 60%,transparent 61%)" : PALETTE[d.c]};${d.light ? "" : "border:1px solid rgba(0,0,0,.15)"}`}), d.n))));
+    if (sel) { const d = D(sel); const box_ = el("div", {class: "sel"}, el("div", {class: "name"}, `${d.n} · ${(d.w / 1000).toFixed(1)} × ${(d.d / 1000).toFixed(1)} m`), el("div", {class: "row"}, el("button", {class: "btn sm", onclick: () => { pushUndo(); sel.rot = (sel.rot + 90) % 360; changed(); }}, "90° 돌리기"), el("button", {class: "btn sm", onclick: () => { pushUndo(); const cp = Object.assign({}, sel, {id: nid(), x: sel.x + 600}); S.items.push(cp); sel = cp; changed(); }}, "복제"), el("button", {class: "btn sm", onclick: () => { pushUndo(); S.items = S.items.filter(i => i !== sel); sel = null; changed(); }}, "지우기")));
+      if (d.len) box_.append(el("div", {class: "field"}, el("label", {}, `길이 ${(d.w / 1000).toFixed(2)} m`), el("input", {type: "range", min: "600", max: "6000", step: "100", value: String(d.w), oninput: (e) => { sel.w = +e.target.value; e.target.previousSibling.textContent = `길이 ${(sel.w / 1000).toFixed(2)} m`; draw2d(); }, onchange: () => changed()})));
+      if (d.photo) box_.append(el("div", {class: "field"}, el("label", {}, `실제 폭 ${(sel.w / 1000).toFixed(2)} m`), el("input", {type: "range", min: "200", max: "4000", step: "50", value: String(sel.w), oninput: (e) => { const k = +e.target.value / sel.w; sel.h = Math.round(sel.h * k); sel.w = +e.target.value; e.target.previousSibling.textContent = `실제 폭 ${(sel.w / 1000).toFixed(2)} m`; }, onchange: () => changed()})));
+      if (d.light) box_.append(el("div", {class: "field"}, el("label", {}, `밝기 ${Math.round((sel.lum ?? d.lum) * 100)}%`), el("input", {type: "range", min: "0.2", max: "4", step: "0.1", value: String(sel.lum ?? d.lum), oninput: (e) => { sel.lum = +e.target.value; e.target.previousSibling.textContent = `밝기 ${Math.round(sel.lum * 100)}%`; }, onchange: () => changed()})));
+      else if (!d.photo) box_.append(el("div", {class: "field"}, el("label", {}, "색"), el("div", {class: "row"}, ...PALETTE.map((c_, i) => el("button", {class: "sw" + ((sel.c ?? d.c) === i ? " on" : ""), style: "width:34px", onclick: () => { pushUndo(); sel.c = i; changed(); }, "aria-label": "색 " + (i + 1)}, el("i", {style: `background:${c_};height:24px;border-radius:8px`}))))));
+      p.append(box_); }
+    const n = S.items.length, nl = S.items.filter(i => D(i).light).length; p.append(el("div", {class: "stat"}, el("div", {}, el("small", {}, "가구"), el("b", {}, String(n - nl))), el("div", {}, el("small", {}, "조명"), el("b", {}, String(nl)))));
+    // 말로 수정
+    const log = el("div", {class: "log"}); chatLog.slice(-6).forEach(m => log.append(el("div", {class: "bub " + m.who}, m.t))); const inp = el("input", {type: "text", id: "cmd", placeholder: "예: 바닥을 회색으로 / 소파 추가 / 조명 더 밝게", autocomplete: "off"});
+    const form = el("form", {onsubmit: async (e) => { e.preventDefault(); const t = inp.value.trim(); if (!t) return; chatLog.push({who: "me", t}); let r = command(t); if (r.startsWith("아직 이해하지") && ai) { chatLog.push({who: "ai", t: "생각 중…"}); renderPanel(); try { r = await commandAI(t); } catch (e2) { r = aiCopy(e2); } chatLog.pop(); } chatLog.push({who: "ai", t: r}); renderPanel(); setTimeout(() => $("#cmd")?.focus(), 0); }}, inp, el("button", {class: "btn sm primary", type: "submit"}, "적용"));
+    p.append(el("div", {class: "chat"}, el("label", {style: "font-size:12px;color:var(--muted)"}, "말로 수정하기 ", el("span", {class: "tag"}, ai ? "Claude 연결됨" : "기본 표현만 이해합니다")), log, form));
+  }
+  if (step === 4) {
+    p.append(H2("투시도 만들기"), el("div", {class: "cats"}, el("button", {class: "btn sm" + (!compMode ? " on" : ""), onclick: () => { show3d(false); fit2d(); renderPanel(); }}, "3D 투시도"), el("button", {class: "btn sm" + (compMode ? " on" : ""), onclick: () => { showComp(true); renderPanel(); }}, "내 방 사진에 합성")));
+    if (compMode) {
+      const bgHandler = async (e) => { const f = e.target.files[0]; if (!f) return; const url = await pickImage(f); e.target.value = ""; if (!url) return; const cv = await shrink(url, 1600); S.roomPhoto = cv.toDataURL("image/jpeg", .9); compBg = await loadImage(S.roomPhoto); save(); drawComp(); renderPanel(); };
+      const bgFile = el("input", {type: "file", accept: "image/*,video/*", hidden: "", id: "bgIn"}); bgFile.addEventListener("change", bgHandler); const bgCam = camInput("bgCam", bgHandler);
+      const cutHandler = async (e) => { const f = e.target.files[0]; e.target.value = ""; if (!f) return; const url = await pickImage(f); if (!url) return; await compAddFile(url); };
+      const cutFile = el("input", {type: "file", accept: "image/*,video/*", hidden: "", id: "cutIn"}); cutFile.addEventListener("change", cutHandler); const cutCam = camInput("cutCam", cutHandler);
+      p.append(P("실제 방 사진 위에 가구 사진을 올려 보는 가장 빠른 실사 미리보기입니다. 끌어서 옮기고, 휠(또는 아래 버튼)로 크기를 맞추세요.", "lead"));
+      p.append(el("div", {class: "row"}, el("button", {class: "btn" + (S.roomPhoto ? "" : " primary"), onclick: () => bgCam.click()}, S.roomPhoto ? "방 다시 찍기" : "방 바로 찍기"), el("button", {class: "btn", onclick: () => bgFile.click()}, "앨범·동영상에서"), bgFile, bgCam));
+      p.append(el("div", {class: "row"}, el("button", {class: "btn", onclick: () => cutCam.click(), disabled: S.roomPhoto ? null : ""}, "가구 바로 찍기"), el("button", {class: "btn", onclick: () => cutFile.click(), disabled: S.roomPhoto ? null : ""}, "가구 이미지 올리기"), cutFile, cutCam));
+      const photos = S.items.filter(i => i.type === "photo"); if (photos.length && S.roomPhoto) p.append(el("div", {class: "field"}, el("label", {}, "4단계에서 넣은 내 가구"), el("div", {class: "row"}, ...photos.map(it => el("button", {class: "btn sm", onclick: () => compAddFromItem(it)}, "+ " + D(it).n)))));
+      if (compSel) p.append(el("div", {class: "sel"}, el("div", {class: "name"}, "선택한 가구"), el("div", {class: "row"}, el("button", {class: "btn sm", onclick: () => { compSel.s *= 1.15; drawComp(); save(); }}, "크게"), el("button", {class: "btn sm", onclick: () => { compSel.s /= 1.15; drawComp(); save(); }}, "작게"), el("button", {class: "btn sm", onclick: () => { compSel.flip = !compSel.flip; drawComp(); save(); }}, "좌우 반전"), el("button", {class: "btn sm", onclick: () => { const i = S.comp.layers.indexOf(compSel); if (i > 0) { S.comp.layers.splice(i, 1); S.comp.layers.unshift(compSel); drawComp(); save(); } }}, "뒤로 보내기"), el("button", {class: "btn sm", onclick: () => { S.comp.layers = S.comp.layers.filter(l => l !== compSel); compSel = null; drawComp(); save(); renderPanel(); }}, "지우기"))));
+      p.append(el("div", {class: "hint"}, "가구 사진은 단색 배경(쇼핑몰 제품 사진)일 때 배경이 자동으로 지워집니다. 복잡한 배경은 그대로 올라가니 미리 잘라 두면 좋습니다."));
+      return;
+    }
+    const pn = el("input", {type: "text", id: "projName", value: S.projectName || "", placeholder: "예: 4층 연습실 인테리어", onchange: (e) => { S.projectName = e.target.value; save(); }});
+    p.append(el("div", {class: "sel"}, el("div", {class: "name"}, "시공으로 이어지는 출력물"), el("div", {class: "field"}, el("label", {}, "프로젝트 이름"), pn), el("div", {class: "row"}, el("button", {class: "btn", onclick: showSheets}, "시공 도면 A-101 · E-101"), el("button", {class: "btn", onclick: showEstimate}, "개략 견적")), el("p", {style: "font-size:12px"}, "투시도는 설득용, 도면과 견적은 시공사에 넘기는 용도입니다. 셋 다 지금 그린 데이터 하나에서 나옵니다.")));
+    p.append(P("평면에서 보고 싶은 자리를 누르고, 누른 채로 끌어 바라볼 방향을 정하세요. ‘미리보기’로 확인한 뒤 투시도를 만듭니다.", "lead"));
+    p.append(el("div", {class: "stat"}, el("div", {}, el("small", {}, "카메라 위치"), el("b", {}, `${(S.cam.x / 1000).toFixed(1)}, ${(S.cam.y / 1000).toFixed(1)} m`)), el("div", {}, el("small", {}, "방향"), el("b", {}, `${Math.round(((S.cam.dir * 180 / Math.PI) % 360 + 360) % 360)}°`))));
+    const hIn = el("input", {type: "range", min: "900", max: "2400", step: "50", value: String(S.cam.h), id: "camH", oninput: (e) => { S.cam.h = +e.target.value; e.target.previousSibling.textContent = `눈높이 ${(S.cam.h / 1000).toFixed(2)} m`; save(); }});
+    const fIn = el("input", {type: "range", min: "45", max: "95", step: "1", value: String(S.cam.fov), id: "camFov", oninput: (e) => { S.cam.fov = +e.target.value; e.target.previousSibling.textContent = `화각 ${S.cam.fov}° (넓을수록 많이 담김)`; save(); draw2d(); }});
+    p.append(el("div", {class: "field"}, el("label", {}, `눈높이 ${(S.cam.h / 1000).toFixed(2)} m`), hIn), el("div", {class: "field"}, el("label", {}, `화각 ${S.cam.fov}° (넓을수록 많이 담김)`), fIn));
+    p.append(el("div", {class: "row"}, el("button", {class: "btn", onclick: () => { show3d(true); viewCam(); setStatus("이 구도로 투시도가 만들어집니다. 끌어서 시선을 조금 돌릴 수 있어요."); }}, "미리보기"), el("button", {class: "btn", onclick: () => { show3d(false); fit2d(); }}, "평면에서 다시 고르기")));
+    p.append(el("div", {class: "hint"}, "‘투시도 만들기’를 누르면 1920×1080 이미지를 만들고, 설계 데이터(JSON)도 함께 저장할 수 있습니다. 이 JSON은 Blender 자동 생성 도구가 그대로 읽습니다."));
+  }
+}
+$("#btnPrev").addEventListener("click", () => goStep(step - 1));
+$("#btnNext").addEventListener("click", async () => { if (step === 4 && compMode) { compExport(); return; } if (step === 4) { if (view2d) { show3d(true); } viewCam(); await new Promise(r => setTimeout(r, 60)); renderer.render(scene, camera); makeRender(); return; } goStep(step + 1); });
+$("#sheetToggle").addEventListener("click", () => { const a = $("#aside"); if (a.classList.contains("half")) { a.classList.remove("half"); a.classList.add("collapsed"); } else a.classList.toggle("collapsed"); setTimeout(() => { resize2d(); resize3d(); if (view2d && autoFit) fit2d(); draw2d(); if (compMode) drawComp(); }, 300); });
+$("#zIn").addEventListener("click", () => zoomBy(1.25)); $("#zOut").addEventListener("click", () => zoomBy(1 / 1.25)); $("#zFit").addEventListener("click", () => { if (view2d) { autoFit = true; fit2d(); draw2d(); } else if (!compMode) viewAerial(true); else drawComp(); });
+let presenting = false;
+function setPresent(on) { presenting = on; document.body.classList.toggle("present", on); if (on) { if (!S.started) { setStatus("먼저 공간을 만들어 주세요."); setPresent(false); return; } show3d(true); viewAerial(true); S.spin = true; renderFloat(); setTimeout(() => { resize3d(); }, 50); setStatus("상담 모드: 끌어서 돌리고, 두 손가락으로 확대·축소, 가구를 두 번 누르면 가까이 갑니다."); } else { S.spin = false; renderFloat(); setTimeout(() => { resize3d(); resize2d(); if (view2d) { fit2d(); draw2d(); } }, 50); } $("#btnPresent").textContent = on ? "상담 모드 끝" : "상담 모드"; }
+$("#btnPresent").addEventListener("click", () => setPresent(!presenting)); $("#presentExit").addEventListener("click", () => setPresent(false));
+$("#presentGo").addEventListener("click", async () => { const inp = $("#presentCmd"); const t = inp.value.trim(); if (!t) return; inp.value = ""; let r = command(t); if (r.startsWith("아직 이해하지") && ai) { setStatus("생각 중…"); try { r = await commandAI(t); } catch (e2) { r = aiCopy(e2); } } setStatus(r); });
+$("#presentCmd").addEventListener("keydown", (e) => { if (e.key === "Enter") $("#presentGo").click(); });
+window.addEventListener("keydown", (e) => { if (e.key === "Escape" && presenting) setPresent(false); });
+$("#btnReset").addEventListener("click", () => { const ok = el("div", {class: "modal"}); ok.append(el("div", {class: "box", style: "max-width:380px"}, el("h2", {style: "margin:0;font-size:17px"}, "처음부터 다시 할까요?"), el("p", {style: "margin:0;color:var(--muted)"}, "지금 그린 공간과 가구가 모두 지워집니다."), el("div", {class: "row"}, el("button", {class: "btn primary", onclick: () => { S = emptyState(); undo = []; photoImg = null; compBg = null; compSel = null; mode = "select"; ok.remove(); goStep(0); fit2d(); draw2d(); save(); }}, "지우고 새로 시작"), el("button", {class: "btn", onclick: () => ok.remove()}, "취소")))); document.body.append(ok); });
+
+/* ============================ 시작 ============================ */
+function boot() {
+  try { const raw = localStorage.getItem("easy-interior-v1"); if (raw) { const o = JSON.parse(raw); if (o && o.walls) { S = Object.assign(emptyState(), o); if (!S.comp || !Array.isArray(S.comp.layers)) S.comp = {layers: []}; if (!FLOORS[S.floor]) S.floor = "wood"; if (!WALLCOLORS[S.wallColor]) S.wallColor = "white"; const ids = JSON.stringify(S).match(/"e(\d+)"/g) || []; uid = ids.reduce((m, s) => Math.max(m, +s.slice(2, -1)), 0) + 1; } } } catch (e) {}
+  if (!S.started) { S = sample4F(); } // 첫 화면은 샘플이 열린 상태
+  init3d(); resize2d(); loadPhoto(); fit2d(); goStep(0); draw2d(); updateReadout();
+  if (isMobile()) { let seen = false; try { seen = !!localStorage.getItem("easy-interior-mobile-hint"); localStorage.setItem("easy-interior-mobile-hint", "1"); } catch (e) {} if (!seen) setStatus("휴대폰: 두 손가락으로 확대·이동, 아래 손잡이를 눌러 메뉴 접기·펼치기. 공유 메뉴에서 ‘홈 화면에 추가’하면 앱처럼 열립니다."); }
+  new ResizeObserver(() => { resize2d(); resize3d(); if (autoFit && view2d) fit2d(); draw2d(); if (compMode) drawComp(); }).observe($("#stage"));
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", draw2d);
+}
+boot();
+</script>
+<script>
+(function(){
+  var HASH = "a1fb4e703a9ef1fa4936801721ff285a97ac85330856674412e054892afe6972"; var KEY = "dm-pin-hash", OK = "dm-pin-ok";
+  function sha(t){ return crypto.subtle.digest("SHA-256", new TextEncoder().encode(t)).then(function(b){ return Array.from(new Uint8Array(b)).map(function(x){ return x.toString(16).padStart(2,"0"); }).join(""); }); }
+  function ok(){ try { return localStorage.getItem(OK) === "1"; } catch(e){ return false; } }
+  var gate = document.getElementById("pin"); if (ok()) return; gate.hidden = false; document.documentElement.style.overflow = "hidden";
+  var buf = ""; var dots = document.querySelectorAll("#pinDots i"); var err = document.getElementById("pinErr"); var keys = document.getElementById("pinKeys");
+  ["1","2","3","4","5","6","7","8","9","←","0","확인"].forEach(function(k){ var b = document.createElement("button"); b.textContent = k; b.type = "button"; b.addEventListener("click", function(){ press(k); }); keys.appendChild(b); });
+  function draw(){ dots.forEach(function(d,i){ d.classList.toggle("on", i < buf.length); }); }
+  function press(k){ if (k === "←") { buf = buf.slice(0,-1); draw(); return; } if (k === "확인") { check(); return; } if (buf.length < 4) { buf += k; draw(); if (buf.length === 4) check(); } }
+  function check(){ var stored = null; try { stored = localStorage.getItem(KEY); } catch(e){} sha(buf).then(function(h){ if (h === (stored || HASH)) { try { localStorage.setItem(OK, "1"); } catch(e){} gate.remove(); document.documentElement.style.overflow = ""; } else { err.textContent = "PIN이 맞지 않습니다."; buf = ""; draw(); } }); }
+  window.setPin = function(p){ return sha(String(p)).then(function(h){ localStorage.setItem(KEY, h); return "PIN 변경됨"; }); };
+})();
+</script><script>if ("serviceWorker" in navigator) { window.addEventListener("load", function(){ navigator.serviceWorker.register("sw.js").catch(function(){}); }); }</script></body></html>
