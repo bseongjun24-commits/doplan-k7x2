@@ -683,8 +683,14 @@ function applyClaudeOps(ops) {
   return n;
 }
 async function commandClaude(text) { const r = await claudeEdit(text); const n = applyClaudeOps(Array.isArray(r.ops) ? r.ops : []); if (n) changed(); return r.reply ? String(r.reply) : (n ? "적용했습니다" : "바꿀 것이 없습니다"); }
-// 말로 수정 공통 진입: Claude 키가 있으면 전부 Claude에게, 없으면 규칙 → (claude.ai 안이면) 샘플 AI
-async function runCommand(t) { if (claudeKey()) { try { return await commandClaude(t); } catch (e) { return claudeCopy(e); } } let r = command(t); if (r.startsWith("아직 이해하지")) { if (ai) { try { r = await commandAI(t); } catch (e2) { r = aiCopy(e2); } } else { r = "🔑 버튼으로 Claude API 키를 넣으면 무엇이든 말로 고칠 수 있어요"; } } return r; }
+// claude.ai 안(아티팩트)에서는 앱에 내장된 Claude(sample)로 — 키 없이 도면 전체를 보고 고침
+async function commandSample(text) {
+  const input = `${claudeSystem()}\n\n현재 도면 상태(JSON):\n${JSON.stringify(stateForClaude())}\n\n요청: ${text}`;
+  const r = await ai.json(input, {cache: false}); const n = applyClaudeOps(Array.isArray(r && r.ops) ? r.ops : []); if (n) changed();
+  return (r && r.reply) ? String(r.reply) : (n ? "적용했습니다" : "바꿀 것이 없습니다");
+}
+// 말로 수정 공통 진입: 내장 Claude(아티팩트) → API 키 → 규칙 순
+async function runCommand(t) { if (ai) { try { return await commandSample(t); } catch (e) { return aiCopy(e); } } if (claudeKey()) { try { return await commandClaude(t); } catch (e) { return claudeCopy(e); } } let r = command(t); if (r.startsWith("아직 이해하지")) r = "이 화면에서는 규칙 명령만 됩니다. claude.ai 아티팩트에서 열면 Claude가 직접 고칩니다"; return r; }
 /* ============================ 사진 합성 (실사 미리보기) ============================ */
 let compMode = false, compSel = null, compDrag = null; const c4 = document.createElement("canvas"); c4.id = "c4"; c4.hidden = true; c4.style.cssText = "position:absolute;inset:0"; $("#stage").insertBefore(c4, $("#float")); const g4 = c4.getContext("2d"); let compBg = null; const compImgs = {};
 function compImg(l) { let im = compImgs[l.id]; if (!im) { im = new Image(); im.onload = drawComp; im.src = l.src; compImgs[l.id] = im; } return im; }
@@ -1053,6 +1059,7 @@ const PRESENT_PH = $("#presentCmd").placeholder;
 $("#presentGo").addEventListener("click", async () => { const inp = $("#presentCmd"); const t = inp.value.trim(); if (!t) return; inp.value = ""; inp.placeholder = claudeKey() ? "Claude가 고치는 중…" : "…"; inp.disabled = true; const r = await runCommand(t); inp.disabled = false; inp.placeholder = r; inp.focus(); setTimeout(() => { if (inp.placeholder === r) inp.placeholder = PRESENT_PH; }, 7000); });
 $("#presentKey").addEventListener("click", () => { askClaudeKey(); const inp = $("#presentCmd"); inp.placeholder = claudeKey() ? "Claude 연결됨 — 이제 무엇이든 말로 고치세요" : PRESENT_PH; $("#presentKey").classList.toggle("on", !!claudeKey()); });
 $("#presentKey").classList.toggle("on", !!claudeKey());
+(function hideKeyIfBuiltIn() { const tick = () => { if (ai) { $("#presentKey").hidden = true; $("#presentKey").classList.add("on"); $("#presentCmd").placeholder = "Claude에게 말하세요: “오른쪽 끝 방에 문 넣어줘”, “복도 1.5 m로”"; } else if (!aiReady) setTimeout(tick, 300); }; tick(); })();
 $("#presentCmd").addEventListener("keydown", (e) => { if (e.key === "Enter") $("#presentGo").click(); });
 window.addEventListener("keydown", (e) => { if (e.key === "Escape" && presenting) setPresent(false); });
 $("#btnReset").addEventListener("click", () => { const ok = el("div", {class: "modal"}); ok.append(el("div", {class: "box", style: "max-width:380px"}, el("h2", {style: "margin:0;font-size:17px"}, "처음부터 다시 할까요?"), el("p", {style: "margin:0;color:var(--muted)"}, "지금 그린 공간과 가구가 모두 지워집니다."), el("div", {class: "row"}, el("button", {class: "btn primary", onclick: () => { S = emptyState(); undo = []; photoImg = null; compBg = null; compSel = null; mode = "select"; ok.remove(); goStep(0); fit2d(); draw2d(); save(); }}, "지우고 새로 시작"), el("button", {class: "btn", onclick: () => ok.remove()}, "취소")))); document.body.append(ok); });
