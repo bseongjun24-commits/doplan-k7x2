@@ -140,7 +140,9 @@ body.present aside,body.present header .steps,body.present #btnReset{display:non
 body.present main{grid-template-columns:1fr}
 body.present .present-bar{display:flex}
 body.present .zoom{bottom:96px}
-body.present .status{bottom:96px;right:14px;max-width:none}
+body.present .status{display:none}
+.present-bar #presentKey.on{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
+.present-bar input::placeholder{color:var(--muted);opacity:.95}
 body.present .readout{display:none}
 .present-bar{display:none;position:absolute;left:50%;bottom:18px;transform:translateX(-50%);z-index:4;gap:8px;align-items:center;background:var(--panel2);border:1px solid var(--line2);border-radius:8px;padding:8px 10px;box-shadow:var(--glow2);max-width:calc(100% - 32px);width:720px;backdrop-filter:blur(10px)}
 .present-bar input{flex:1;min-width:0;border:1px solid var(--line);background:rgba(0,0,0,.4);border-radius:4px;padding:10px 12px;font-size:15px}
@@ -208,7 +210,7 @@ button{touch-action:manipulation}
     <div class="float" id="float"></div>
     <div class="zoom" id="zoom"><button class="btn" id="zIn" title="확대">+</button><button class="btn" id="zOut" title="축소">−</button><button class="btn" id="zFit" title="전체 보기" style="font-size:13px">⤢</button></div>
     <div class="status" id="status">시작 방법을 고르세요.</div>
-    <div class="present-bar" id="presentBar"><input type="text" id="presentCmd" placeholder="말로 수정: “벽을 벽지 베이지로”, “소파 추가”, “우물천장 넣어줘”" autocomplete="off"><button class="btn primary" id="presentGo">적용</button><button class="btn" id="presentExit">나가기</button></div>
+    <div class="present-bar" id="presentBar"><input type="text" id="presentCmd" placeholder="말로 수정: “오른쪽 끝 방에 문 넣어줘”, “복도 1.5 m로”, “벽을 베이지로”" autocomplete="off"><button class="btn primary" id="presentGo">적용</button><button class="btn" id="presentKey" title="Claude API 키 연결">🔑</button><button class="btn" id="presentExit">나가기</button></div>
   </section>
 </main>
 
@@ -623,6 +625,66 @@ async function commandAI(text) {
   for (const o of ops) { if (o.op === "floor" && FLOORS[o.value]) { S.floor = o.value; S.rooms.forEach(rr => rr.fin = o.value); n++; } else if (o.op === "wallColor" && WALLCOLORS[o.value]) { if (selWall) selWall.col = o.value; else S.wallColor = o.value; n++; } else if (o.op === "wallFin" && WALLFIN[o.value]) { if (selWall) selWall.fin = o.value; else S.wallFin = o.value; n++; } else if (o.op === "cove") { S.cove = !!o.value; n++; } else if (o.op === "baseboard") { S.baseboard = !!o.value; n++; } else if (o.op === "door" && DOORCOLORS[o.value]) { S.doorColor = o.value; n++; } else if (o.op === "add" && ITEM[o.type]) { const c = Math.min(10, Number(o.count) || 1); for (let i = 0; i < c; i++) addItem(o.type, i * 600); n++; } else if (o.op === "remove" && ITEM[o.type]) { const c = Math.min(10, Number(o.count) || 1); for (let i = 0; i < c; i++) { const idx = S.items.map(x => x.type).lastIndexOf(o.type); if (idx >= 0) S.items.splice(idx, 1); } n++; } else if (o.op === "lights") { const f = Math.max(.3, Math.min(3, Number(o.factor) || 1)); S.items.forEach(i => { if (D(i).light) i.lum = Math.max(.2, Math.min(4, (i.lum ?? D(i).lum) * f)); }); n++; } else if (o.op === "night") { S.night = !!o.value; n++; } else if (o.op === "glass") { const w = S.walls.filter(x => !x.outer).sort((a, b) => wlen(b) - wlen(a))[0]; if (w) { w.kind = "glass"; n++; } } }
   if (n) changed(); return (r && r.reply) ? String(r.reply) : (n ? "적용했습니다." : "이해하지 못했습니다.");
 }
+// ---- Claude API 직접 연결: 상담 모드에서 말한 것을 Claude가 도면 전체를 보고 바로 고침 ----
+const CK_KEY = "dm-claude-key"; let claudeHist = [];
+function claudeKey() { try { return localStorage.getItem(CK_KEY) || ""; } catch (e) { return ""; } }
+function setClaudeKey(k) { try { if (k && k.trim()) localStorage.setItem(CK_KEY, k.trim()); else localStorage.removeItem(CK_KEY); } catch (e) {} return claudeKey() ? "Claude 연결됨" : "키 없음"; }
+function askClaudeKey() { const k = window.prompt("Anthropic API 키 (sk-ant-…)를 넣으세요. 이 기기 브라우저에만 저장됩니다. 비우면 연결 해제.", claudeKey()); if (k !== null) setClaudeKey(k); return !!claudeKey(); }
+function claudeCopy(e) { const c = e && e.code; if (c === "no_key") return "🔑 버튼으로 API 키를 먼저 넣어 주세요"; if (c === "bad_key") return "API 키가 올바르지 않습니다"; if (c === "rate_limited") return "요청이 많습니다. 잠시 후 다시"; if (c === "refusal") return "처리할 수 없는 요청입니다"; if (c === "invalid_json") return "해석에 실패했습니다. 다시 말해 주세요"; if (c === "http") return "연결 오류 " + (e.status || ""); return "연결에 실패했습니다"; }
+function stateForClaude() { const s = JSON.parse(JSON.stringify(S)); delete s.photo; delete s.roomPhoto; delete s.comp; s.photoW = s.photoH = undefined; s.items = s.items.map(i => { const o = {...i}; delete o.img; return o; }); return s; }
+function claudeSystem() {
+  return `당신은 '도면 생성기'(2D/3D 인테리어 편집기)의 편집 비서입니다. 사용자가 상담 모드에서 말로 요청하면, 함께 주는 현재 도면 상태(JSON)를 보고 수정 작업(ops) 목록을 JSON 하나로만 답합니다. 설명 문장, 코드펜스, JSON 밖의 글자 금지.
+좌표는 mm, x는 오른쪽(+), y는 아래(+). 벽 {id,x1,y1,x2,y2,kind:"wall"|"glass",outer,ops:[{t:"door"|"window",at,w}]} — at는 벽 시작점(x1,y1)에서 개구부 시작까지 거리(mm), w는 폭. 실 {id,name,fin,pts:[{x,y}]}. 가구·조명 {id,type,x,y,rot(도),w(폭 mm, 선택),lum(조명 밝기)}. 카메라 cam {x,y,dir(라디안, 0=오른쪽, -1.57=위)}.
+가구·조명 type 키: ${Object.entries(ITEM).map(([k, v]) => k + "=" + v.n).join(", ")}
+작업 종류:
+ {"op":"set","key":"floor|wallColor|wallFin|cove|baseboard|doorColor|night|ceilH|projectName","value":...}
+ {"op":"wall.add","x1":0,"y1":0,"x2":0,"y2":0,"kind":"wall|glass"}  {"op":"wall.update","id":"...","x1":..,"kind":..,"fin":..,"col":..}  {"op":"wall.remove","id":"..."}
+ {"op":"opening.add","wall":"<벽 id>","t":"door|window","at":0,"w":900}  {"op":"opening.remove","wall":"<벽 id>","index":0}
+ {"op":"room.add","name":"...","pts":[{"x":0,"y":0},...],"fin":"tile"}  {"op":"room.update","id":"...","name":..,"fin":..,"pts":..}  {"op":"room.remove","id":"..."}
+ {"op":"item.add","type":"<키>","x":0,"y":0,"rot":0,"w":1200}  {"op":"item.update","id":"...","x":..,"y":..,"rot":..,"w":..}  {"op":"item.remove","id":"..."}
+ {"op":"outline","pts":[...]} (외곽 변경 — 외벽의 창·문이 초기화되므로 꼭 필요할 때만)  {"op":"cam","x":0,"y":0,"dir":0}
+값 목록 — floor: ${Object.keys(FLOORS).join("|")} / wallColor: ${Object.keys(WALLCOLORS).join("|")} / wallFin: ${Object.keys(WALLFIN).join("|")} / doorColor: wood|white|dark
+원칙: 사용자가 말한 것만 바꾸고 임의로 추가하지 않는다. 기존 id를 정확히 쓴다. 벽을 옮기면 그 벽에 붙은 실의 pts도 맞춘다. 치수가 없으면 상식적 치수(문 900, 창 1500, 통로 1200 이상, 치과 체어 방 깊이 3000 이상)를 쓴다. 방·벽 지칭은 상태 JSON의 이름·좌표로 찾는다(예: "오른쪽 끝 방" = x가 가장 큰 실). 애매하면 ops를 비우고 reply로 짧게 되묻는다.
+답 형식: {"ops":[...],"reply":"15자 내외 한 문장"}`;
+}
+async function claudeEdit(text) {
+  const key = claudeKey(); if (!key) throw Object.assign(new Error("no key"), {code: "no_key"});
+  const user = {role: "user", content: `현재 도면 상태(JSON):\n${JSON.stringify(stateForClaude())}\n\n요청: ${text}`};
+  const body = {model: "claude-opus-5-5", max_tokens: 8000, system: claudeSystem(), messages: [...claudeHist, user], output_config: {effort: "medium"}, fallbacks: "default"};
+  const res = await fetch("https://api.anthropic.com/v1/messages", {method: "POST", headers: {"content-type": "application/json", "x-api-key": key, "anthropic-version": "2026-10-21", "anthropic-beta": "server-side-fallback-2026-07-01", "anthropic-dangerous-direct-browser-access": "true"}, body: JSON.stringify(body)});
+  if (!res.ok) { const t = await res.text().catch(() => ""); throw Object.assign(new Error(t), {code: res.status === 401 || res.status === 403 ? "bad_key" : res.status === 429 ? "rate_limited" : "http", status: res.status}); }
+  const msg = await res.json(); if (msg.stop_reason === "refusal") throw Object.assign(new Error("refusal"), {code: "refusal"});
+  const txt = (msg.content || []).filter(b => b.type === "text").map(b => b.text).join("\n"); const m = txt.match(/\{[\s\S]*\}/); let r;
+  try { r = JSON.parse(m ? m[0] : txt); } catch (e) { throw Object.assign(new Error("json"), {code: "invalid_json", raw: txt}); }
+  claudeHist.push({role: "user", content: `요청: ${text}`}, {role: "assistant", content: JSON.stringify({ops_count: Array.isArray(r.ops) ? r.ops.length : 0, reply: r.reply || ""})}); if (claudeHist.length > 12) claudeHist.splice(0, claudeHist.length - 12);
+  return r;
+}
+function applyClaudeOps(ops) {
+  let n = 0; const W = id => S.walls.find(w => w.id === id), R = id => S.rooms.find(r => r.id === id), I = id => S.items.find(i => i.id === id);
+  const num = v => Number(v) || 0, pts = p => Array.isArray(p) ? p.map(q => ({x: num(q.x), y: num(q.y)})) : null;
+  pushUndo();
+  for (const o of ops) { try { switch (o.op) {
+    case "set": { const k = o.key || o.path; if (k === "floor" && FLOORS[o.value]) { S.floor = o.value; S.rooms.forEach(r => r.fin = o.value); n++; } else if (k === "wallColor" && WALLCOLORS[o.value]) { S.wallColor = o.value; n++; } else if (k === "wallFin" && WALLFIN[o.value]) { S.wallFin = o.value; n++; } else if (k === "doorColor" && DOORCOLORS[o.value]) { S.doorColor = o.value; n++; } else if (["cove", "baseboard", "night", "holo", "spin"].includes(k)) { S[k] = !!o.value; n++; } else if (k === "ceilH") { S.ceilH = Math.max(2000, Math.min(6000, num(o.value))); n++; } else if (k === "projectName") { S.projectName = String(o.value); n++; } break; }
+    case "wall.add": S.walls.push({id: nid(), x1: num(o.x1), y1: num(o.y1), x2: num(o.x2), y2: num(o.y2), kind: o.kind === "glass" ? "glass" : "wall", ops: []}); n++; break;
+    case "wall.update": { const w = W(o.id); if (!w) break; for (const k of ["x1", "y1", "x2", "y2"]) if (o[k] != null) w[k] = num(o[k]); if (o.kind) w.kind = o.kind === "glass" ? "glass" : "wall"; if (o.fin && WALLFIN[o.fin]) w.fin = o.fin; if (o.col && WALLCOLORS[o.col]) w.col = o.col; n++; break; }
+    case "wall.remove": { const i = S.walls.findIndex(w => w.id === o.id); if (i >= 0) { S.walls.splice(i, 1); n++; } break; }
+    case "opening.add": { const w = W(o.wall); if (!w) break; const L = wlen(w); const ww = Math.max(400, Math.min(L, num(o.w) || (o.t === "window" ? 1500 : 900))); const at = Math.max(0, Math.min(L - ww, num(o.at))); w.ops.push({id: nid(), t: o.t === "window" ? "window" : "door", at, w: ww}); n++; break; }
+    case "opening.remove": { const w = W(o.wall); if (!w) break; if (o.index != null && w.ops[o.index]) { w.ops.splice(o.index, 1); n++; } else if (w.ops.length) { w.ops.length = 0; n++; } break; }
+    case "room.add": { const p = pts(o.pts); if (p && p.length >= 3) { S.rooms.push({id: nid(), name: String(o.name || ""), fin: FLOORS[o.fin] ? o.fin : S.floor, pts: p}); n++; } break; }
+    case "room.update": { const r = R(o.id); if (!r) break; if (o.name != null) r.name = String(o.name); if (o.fin && FLOORS[o.fin]) r.fin = o.fin; const p = pts(o.pts); if (p && p.length >= 3) r.pts = p; n++; break; }
+    case "room.remove": { const i = S.rooms.findIndex(r => r.id === o.id); if (i >= 0) { S.rooms.splice(i, 1); n++; } break; }
+    case "item.add": { const d = ITEM[o.type]; if (!d) break; const it = {id: nid(), type: o.type, x: num(o.x), y: num(o.y), rot: num(o.rot), c: d.c, lum: d.lum}; if (o.w) it.w = num(o.w); if (o.lum != null) it.lum = num(o.lum); S.items.push(it); n++; break; }
+    case "item.update": { const it = I(o.id); if (!it) break; for (const k of ["x", "y", "rot", "w", "lum", "c"]) if (o[k] != null) it[k] = num(o[k]); if (o.type && ITEM[o.type]) it.type = o.type; n++; break; }
+    case "item.remove": { const i = S.items.findIndex(it => it.id === o.id); if (i >= 0) { S.items.splice(i, 1); n++; } break; }
+    case "outline": { const p = pts(o.pts); if (p && p.length >= 3) { S.outline = p; rebuildOuter(); n++; } break; }
+    case "cam": { for (const k of ["x", "y", "dir", "h", "fov"]) if (o[k] != null) S.cam[k] = num(o[k]); n++; break; }
+  } } catch (e) {} }
+  if (!n) undo.pop();
+  return n;
+}
+async function commandClaude(text) { const r = await claudeEdit(text); const n = applyClaudeOps(Array.isArray(r.ops) ? r.ops : []); if (n) changed(); return r.reply ? String(r.reply) : (n ? "적용했습니다" : "바꿀 것이 없습니다"); }
+// 말로 수정 공통 진입: Claude 키가 있으면 전부 Claude에게, 없으면 규칙 → (claude.ai 안이면) 샘플 AI
+async function runCommand(t) { if (claudeKey()) { try { return await commandClaude(t); } catch (e) { return claudeCopy(e); } } let r = command(t); if (r.startsWith("아직 이해하지")) { if (ai) { try { r = await commandAI(t); } catch (e2) { r = aiCopy(e2); } } else { r = "🔑 버튼으로 Claude API 키를 넣으면 무엇이든 말로 고칠 수 있어요"; } } return r; }
 /* ============================ 사진 합성 (실사 미리보기) ============================ */
 let compMode = false, compSel = null, compDrag = null; const c4 = document.createElement("canvas"); c4.id = "c4"; c4.hidden = true; c4.style.cssText = "position:absolute;inset:0"; $("#stage").insertBefore(c4, $("#float")); const g4 = c4.getContext("2d"); let compBg = null; const compImgs = {};
 function compImg(l) { let im = compImgs[l.id]; if (!im) { im = new Image(); im.onload = drawComp; im.src = l.src; compImgs[l.id] = im; } return im; }
@@ -933,7 +995,7 @@ function renderPanel() {
     const n = S.items.length, nl = S.items.filter(i => D(i).light).length; p.append(el("div", {class: "stat"}, el("div", {}, el("small", {}, "가구"), el("b", {}, String(n - nl))), el("div", {}, el("small", {}, "조명"), el("b", {}, String(nl)))));
     // 말로 수정
     const log = el("div", {class: "log"}); chatLog.slice(-6).forEach(m => log.append(el("div", {class: "bub " + m.who}, m.t))); const inp = el("input", {type: "text", id: "cmd", placeholder: "예: 바닥을 회색으로 / 소파 추가 / 조명 더 밝게", autocomplete: "off"});
-    const form = el("form", {onsubmit: async (e) => { e.preventDefault(); const t = inp.value.trim(); if (!t) return; chatLog.push({who: "me", t}); let r = command(t); if (r.startsWith("아직 이해하지") && ai) { chatLog.push({who: "ai", t: "생각 중…"}); renderPanel(); try { r = await commandAI(t); } catch (e2) { r = aiCopy(e2); } chatLog.pop(); } chatLog.push({who: "ai", t: r}); renderPanel(); setTimeout(() => $("#cmd")?.focus(), 0); }}, inp, el("button", {class: "btn sm primary", type: "submit"}, "적용"));
+    const form = el("form", {onsubmit: async (e) => { e.preventDefault(); const t = inp.value.trim(); if (!t) return; chatLog.push({who: "me", t}); chatLog.push({who: "ai", t: "생각 중…"}); renderPanel(); const r = await runCommand(t); chatLog.pop(); chatLog.push({who: "ai", t: r}); renderPanel(); setTimeout(() => $("#cmd")?.focus(), 0); }}, inp, el("button", {class: "btn sm primary", type: "submit"}, "적용"));
     p.append(el("div", {class: "chat"}, el("label", {style: "font-size:12px;color:var(--muted)"}, "말로 수정하기 ", el("span", {class: "tag"}, ai ? "Claude 연결됨" : "기본 표현만 이해합니다")), log, form));
   }
   if (step === 4) {
@@ -987,7 +1049,10 @@ $("#btnShare").addEventListener("click", showShare);
 let presenting = false;
 function setPresent(on) { presenting = on; document.body.classList.toggle("present", on); if (on) { if (!S.started) { setStatus("먼저 공간을 만들어 주세요."); setPresent(false); return; } show3d(true); viewAerial(true); S.spin = true; renderFloat(); setTimeout(() => { resize3d(); }, 50); setStatus("상담 모드: 끌어서 돌리고, 두 손가락으로 확대·축소, 가구를 두 번 누르면 가까이 갑니다."); } else { S.spin = false; renderFloat(); setTimeout(() => { resize3d(); resize2d(); if (view2d) { fit2d(); draw2d(); } }, 50); } $("#btnPresent").textContent = on ? "상담 모드 끝" : "상담 모드"; }
 $("#btnPresent").addEventListener("click", () => setPresent(!presenting)); $("#presentExit").addEventListener("click", () => setPresent(false));
-$("#presentGo").addEventListener("click", async () => { const inp = $("#presentCmd"); const t = inp.value.trim(); if (!t) return; inp.value = ""; let r = command(t); if (r.startsWith("아직 이해하지") && ai) { setStatus("생각 중…"); try { r = await commandAI(t); } catch (e2) { r = aiCopy(e2); } } setStatus(r); });
+const PRESENT_PH = $("#presentCmd").placeholder;
+$("#presentGo").addEventListener("click", async () => { const inp = $("#presentCmd"); const t = inp.value.trim(); if (!t) return; inp.value = ""; inp.placeholder = claudeKey() ? "Claude가 고치는 중…" : "…"; inp.disabled = true; const r = await runCommand(t); inp.disabled = false; inp.placeholder = r; inp.focus(); setTimeout(() => { if (inp.placeholder === r) inp.placeholder = PRESENT_PH; }, 7000); });
+$("#presentKey").addEventListener("click", () => { askClaudeKey(); const inp = $("#presentCmd"); inp.placeholder = claudeKey() ? "Claude 연결됨 — 이제 무엇이든 말로 고치세요" : PRESENT_PH; $("#presentKey").classList.toggle("on", !!claudeKey()); });
+$("#presentKey").classList.toggle("on", !!claudeKey());
 $("#presentCmd").addEventListener("keydown", (e) => { if (e.key === "Enter") $("#presentGo").click(); });
 window.addEventListener("keydown", (e) => { if (e.key === "Escape" && presenting) setPresent(false); });
 $("#btnReset").addEventListener("click", () => { const ok = el("div", {class: "modal"}); ok.append(el("div", {class: "box", style: "max-width:380px"}, el("h2", {style: "margin:0;font-size:17px"}, "처음부터 다시 할까요?"), el("p", {style: "margin:0;color:var(--muted)"}, "지금 그린 공간과 가구가 모두 지워집니다."), el("div", {class: "row"}, el("button", {class: "btn primary", onclick: () => { S = emptyState(); undo = []; photoImg = null; compBg = null; compSel = null; mode = "select"; ok.remove(); goStep(0); fit2d(); draw2d(); save(); }}, "지우고 새로 시작"), el("button", {class: "btn", onclick: () => ok.remove()}, "취소")))); document.body.append(ok); });
