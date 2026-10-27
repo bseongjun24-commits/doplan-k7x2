@@ -141,6 +141,18 @@ body.present main{grid-template-columns:1fr}
 body.present .present-bar{display:flex}
 body.present .zoom{bottom:96px}
 body.present .status{display:none}
+/* AR 보기 */
+#arVideo{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;background:#000}
+body.ar-cam #c3{z-index:1}
+body.ar .stage,body.ar #c3{background:transparent}
+body.ar .zoom,body.ar .present-bar,body.ar .status,body.ar .readout,body.ar .float{display:none}
+#arUI{position:absolute;inset:0;z-index:6;pointer-events:none;display:flex;flex-direction:column;justify-content:space-between;padding:10px;gap:8px;padding-bottom:max(10px,env(safe-area-inset-bottom))}
+#arUI .ar-top,#arUI .ar-bot{pointer-events:auto}
+#arUI .ar-top{display:flex;justify-content:space-between;align-items:center;gap:8px;background:rgba(0,0,0,.5);border-radius:8px;padding:6px 10px;color:#fff;font-size:13px}
+#arUI .ar-bot{display:grid;gap:6px;background:rgba(0,0,0,.5);border-radius:8px;padding:8px}
+#arUI .ar-row{display:flex;gap:6px;flex-wrap:wrap}
+#arUI input{flex:1;min-width:0;border:1px solid var(--line);background:rgba(0,0,0,.55);border-radius:4px;padding:9px 10px;font-size:14px;color:#fff}
+#arUI input::placeholder{color:#cfd8df}
 .present-bar #presentKey.on{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
 .present-bar input::placeholder{color:var(--muted);opacity:.95}
 body.present .readout{display:none}
@@ -208,7 +220,9 @@ button{touch-action:manipulation}
     <div class="hud" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
     <div class="readout" id="readout" aria-live="polite"></div>
     <div class="float" id="float"></div>
-    <div class="zoom" id="zoom"><button class="btn" id="zIn" title="확대">+</button><button class="btn" id="zOut" title="축소">−</button><button class="btn" id="zFit" title="전체 보기" style="font-size:13px">⤢</button></div>
+    <div class="zoom" id="zoom"><button class="btn" id="zIn" title="확대">+</button><button class="btn" id="zOut" title="축소">−</button><button class="btn" id="zFit" title="전체 보기" style="font-size:13px">⤢</button><button class="btn" id="zAR" title="AR 보기: 카메라에 도면을 실제 크기로 겹쳐 봅니다" style="font-size:12px;font-weight:700" hidden>AR</button></div>
+    <video id="arVideo" playsinline muted autoplay hidden></video>
+    <div id="arUI" hidden><div class="ar-top"><span id="arMsg">AR</span><button class="btn sm" id="arExit">나가기</button></div><div class="ar-bot"><div class="ar-row"><button class="btn sm" id="arL">↺ 15°</button><button class="btn sm" id="arR">↻ 15°</button><button class="btn sm" id="arFwd">▲ 앞으로</button><button class="btn sm" id="arBack">▼ 뒤로</button><button class="btn sm" id="arMini">미니어처</button><button class="btn sm" id="arCeil">천장</button><button class="btn sm" id="arRe">다시 놓기</button></div><div class="ar-row"><input type="text" id="arCmd" placeholder="말로 수정: “여기 벽을 유리로”, “체어 하나 더”" autocomplete="off"><button class="btn sm primary" id="arGo">적용</button></div></div></div>
     <div class="status" id="status">시작 방법을 고르세요.</div>
     <div class="present-bar" id="presentBar"><input type="text" id="presentCmd" placeholder="말로 수정: “오른쪽 끝 방에 문 넣어줘”, “복도 1.5 m로”, “벽을 베이지로”" autocomplete="off"><button class="btn primary" id="presentGo">적용</button><button class="btn" id="presentKey" title="Claude API 키 연결">🔑</button><button class="btn" id="presentExit">나가기</button></div>
   </section>
@@ -713,7 +727,7 @@ async function compExport() { if (!compBg) return; const cv = document.createEle
 /* ============================ 3D ============================ */
 const c3 = $("#c3"); let holoGrid, buildT0 = 0, spinT = 0; let renderer, scene, camera, controls, world, lightsGroup, hemi, sun, raycaster = new THREE.Raycaster(), floorPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), meshByItem = new Map(), texCache = {}, walk = false, drag3 = null;
 function init3d() {
-  renderer = new THREE.WebGLRenderer({canvas: c3, antialias: true, preserveDrawingBuffer: true}); renderer.setPixelRatio(Math.min(isMobile() ? 1.5 : 2, devicePixelRatio || 1)); renderer.outputEncoding = THREE.sRGBEncoding; renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.0; renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer = new THREE.WebGLRenderer({canvas: c3, antialias: true, preserveDrawingBuffer: true, alpha: true}); renderer.setPixelRatio(Math.min(isMobile() ? 1.5 : 2, devicePixelRatio || 1)); renderer.outputEncoding = THREE.sRGBEncoding; renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.0; renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   scene = new THREE.Scene(); camera = new THREE.PerspectiveCamera(55, 1, 0.05, 500);
   controls = new THREE.OrbitControls(camera, c3); controls.enableDamping = true; controls.dampingFactor = .08; controls.maxPolarAngle = Math.PI / 2 - 0.02;
   hemi = new THREE.HemisphereLight(0xffffff, 0x8a8070, 1.0); scene.add(hemi);
@@ -722,7 +736,7 @@ function init3d() {
   holoGrid = new THREE.GridHelper(80, 80, 0x5ed7ff, 0x1a3a4a); holoGrid.material.transparent = true; holoGrid.material.opacity = .35; holoGrid.position.y = -.01; scene.add(holoGrid);
   c3.addEventListener("dblclick", on3dbl);
   c3.addEventListener("pointerdown", on3down); c3.addEventListener("pointermove", on3move); c3.addEventListener("pointerup", on3up);
-  (function loop(now) { requestAnimationFrame(loop); if (view2d || compMode) return;
+  (function loop(now) { requestAnimationFrame(loop); const zar = $("#zAR"); if (zar) zar.hidden = view2d || compMode || arActive || !!(window.claude && window.claude.use) || !(navigator.xr || (navigator.mediaDevices && navigator.mediaDevices.getUserMedia)); if (view2d || compMode || arActive) return;
     if (S.spin && !walk) { controls.autoRotate = true; controls.autoRotateSpeed = .8; } else controls.autoRotate = false;
     controls.update();
     // 세우기 애니메이션: 바닥에서 솟아오르듯 (0.9초)
@@ -766,7 +780,7 @@ function rebuild3d() {
   for (const room of floorPolys()) { const key = FLOORS[room.fin] ? room.fin : S.floor; const t = floorTex(key); const geo = new THREE.ShapeGeometry(shapeOf(room.pts, false)); const fl = new THREE.Mesh(geo, M(0xffffff, {map: t, roughness: key === "carpet" ? 1 : .35})); fl.rotation.x = -Math.PI / 2; fl.receiveShadow = true;
     const uv = geo.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) / 2.4, uv.getY(i) / 2.4); // 1타일 = 2.4 m
     world.add(fl);
-    const cg = new THREE.ShapeGeometry(shapeOf(room.pts, true)); const cl = new THREE.Mesh(cg, M(0xf4f3ef, {roughness: 1})); cl.rotation.x = Math.PI / 2; cl.position.y = H; world.add(cl);
+    const cg = new THREE.ShapeGeometry(shapeOf(room.pts, true)); const cl = new THREE.Mesh(cg, M(0xf4f3ef, {roughness: 1})); cl.rotation.x = Math.PI / 2; cl.position.y = H; cl.userData.ceil = true; cl.visible = !(arActive && !arShowCeil); world.add(cl);
     if (S.cove) { // 우물천장: 둘레 단차 + LED 띠 + 보조 광원
       const pts = room.pts, n = pts.length, cx = pts.reduce((m, q) => m + q.x, 0) / n / 1000, cz = pts.reduce((m, q) => m + q.y, 0) / n / 1000; const soff = M(0xf4f3ef, {roughness: 1}), led = new THREE.MeshStandardMaterial({color: 0xffffff, emissive: 0xffe3b8, emissiveIntensity: 3});
       for (let i = 0; i < n; i++) { const a = pts[i], b = pts[(i + 1) % n]; const L = dist(a, b) / 1000; if (L < .9) continue; const ang = Math.atan2(b.y - a.y, b.x - a.x); const gg = new THREE.Group(); gg.position.set(a.x / 1000, 0, a.y / 1000); gg.rotation.y = -ang; const mx = (a.x + b.x) / 2000, mz = (a.y + b.y) / 2000; const inward = ((cx - mx) * -Math.sin(ang) + (cz - mz) * Math.cos(ang)) >= 0 ? 1 : -1; gg.add(box0(L, .12, .45, soff, L / 2, H - .06, inward * .225)); gg.add(box0(L - .5, .02, .02, led, L / 2, H - .03, inward * .46)); world.add(gg); }
@@ -852,6 +866,74 @@ let camPlaced = false;
 function viewAerial(animated) { camPlaced = true; walk = false; controls.enabled = true; controls.maxPolarAngle = Math.PI / 2 - .02; const b = bbox(); const cx = (b.x0 + b.x1) / 2000, cz = (b.y0 + b.y1) / 2000, R = Math.max(b.x1 - b.x0, b.y1 - b.y0) / 1000; camera.fov = 50; camera.updateProjectionMatrix(); const to = new THREE.Vector3(cx - R * .55, R * .85, cz + R * .9), toT = new THREE.Vector3(cx, .5, cz); if (animated) { const from = camera.position.clone(), fromT = controls.target.clone(); const t0 = performance.now(); const st = (now) => { const t = Math.min(1, (now - t0) / 700), e = 1 - Math.pow(1 - t, 3); camera.position.lerpVectors(from, to, e); controls.target.lerpVectors(fromT, toT, e); controls.update(); if (t < 1) requestAnimationFrame(st); }; requestAnimationFrame(st); } else { camera.position.copy(to); controls.target.copy(toT); controls.update(); } }
 function viewCam() { camPlaced = true; walk = true; controls.enabled = true; controls.maxPolarAngle = Math.PI - .05; camera.fov = S.cam.fov; camera.updateProjectionMatrix(); const h = S.cam.h / 1000; camera.position.set(S.cam.x / 1000, h, S.cam.y / 1000); controls.target.set(S.cam.x / 1000 + Math.cos(S.cam.dir) * 3, h - .15, S.cam.y / 1000 + Math.sin(S.cam.dir) * 3); controls.update(); }
 function placeCamAtCenter() { if (S.cam.x === 0 && S.cam.y === 0) { const b = bbox(); S.cam.x = b.x0 + (b.x1 - b.x0) * .15; S.cam.y = b.y0 + (b.y1 - b.y0) * .5; S.cam.dir = 0; } }
+/* ============================ AR 보기: 안드로이드 크롬 = WebXR(바닥 인식), 그 외 = 카메라 배경 + 자이로 ============================ */
+let arActive = false, arShowCeil = false, arSession = null, arHit = null, arRefSpace = null, arReticle = null, arStream = null, arOri = null, arPlaced = false, arScale = 1, arSaved = null, arYaw = 0, arAnchor = null, arMode = "";
+const arUI = $("#arUI"), arVideo = $("#arVideo"), Y_AXIS = new THREE.Vector3(0, 1, 0);
+function arMsg(t) { $("#arMsg").textContent = t; }
+function applyARVis() { world.children.forEach(o => { if (o.userData && o.userData.ceil) o.visible = !arActive || arShowCeil; }); lightsGroup.position.copy(world.position); lightsGroup.rotation.copy(world.rotation); lightsGroup.scale.copy(world.scale); }
+{ const _rb = rebuild3d; rebuild3d = function () { _rb(); if (arActive) applyARVis(); }; }
+function viewYaw(cam) { const d = new THREE.Vector3(); cam.getWorldDirection(d); return Math.atan2(d.z, d.x); }   // 평면상 진행 방향(도면 dir과 같은 기준)
+function placeWorldAt(p, phoneYaw) {
+  // 도면의 카메라 자리(S.cam)가 p 에 오고, 도면 카메라 방향(S.cam.dir)이 폰이 보는 방향이 되도록 회전·이동
+  placeCamAtCenter(); const ry = S.cam.dir - phoneYaw + arYaw; const off = new THREE.Vector3(S.cam.x / 1000, 0, S.cam.y / 1000).applyAxisAngle(Y_AXIS, ry).multiplyScalar(arScale);
+  world.rotation.set(0, ry, 0); world.scale.setScalar(arScale); world.position.copy(p).sub(off); world.visible = true; arPlaced = true; applyARVis();
+}
+async function startAR() {
+  if (arActive) return; if (view2d || compMode) show3d(true);
+  arSaved = {bg: scene.background, grid: holoGrid.visible, pos: world.position.clone(), rot: world.rotation.clone(), scale: world.scale.clone(), fov: camera.fov, presenting};
+  arYaw = 0; arScale = 1; arShowCeil = false; arPlaced = false; $("#arMini").textContent = "미니어처"; $("#arCeil").textContent = "천장";
+  let xrOK = false; try { xrOK = !!(navigator.xr && await navigator.xr.isSessionSupported("immersive-ar")); } catch (e) {}
+  if (xrOK) { try { arUI.hidden = false; await startXR(); return; } catch (e) { console.warn("WebXR AR 실패 → 카메라 모드", e); arUI.hidden = true; arActive = false; arSession = null; renderer.xr.enabled = false; } }
+  try { await startCamAR(); } catch (e) { arActive = false; setStatus("카메라를 열 수 없습니다. 브라우저의 카메라 권한을 허용해 주세요. (" + (e && e.name || e) + ")"); }
+}
+async function startXR() {
+  const session = await navigator.xr.requestSession("immersive-ar", {requiredFeatures: ["hit-test"], optionalFeatures: ["dom-overlay"], domOverlay: {root: arUI}});
+  arSession = session; arActive = true; arMode = "xr"; document.body.classList.add("ar"); arUI.hidden = false; $("#arMini").hidden = false; $("#arRe").hidden = false;
+  renderer.xr.enabled = true; renderer.xr.setReferenceSpaceType("local"); await renderer.xr.setSession(session);
+  scene.background = null; holoGrid.visible = false; world.visible = false; applyARVis();
+  if (!arReticle) { arReticle = new THREE.Mesh(new THREE.RingGeometry(.12, .17, 40).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({color: 0x5ed7ff, transparent: true, opacity: .9})); arReticle.matrixAutoUpdate = false; scene.add(arReticle); }
+  arReticle.visible = false; arRefSpace = await session.requestReferenceSpace("local"); const viewer = await session.requestReferenceSpace("viewer"); arHit = await session.requestHitTestSource({space: viewer});
+  arMsg("바닥을 천천히 비추고, 내가 서 있을 자리(도면의 카메라 자리)를 화면에서 누르세요");
+  session.addEventListener("select", () => { if (!arReticle.visible) return; const p = new THREE.Vector3().setFromMatrixPosition(arReticle.matrix); arAnchor = p.clone(); placeWorldAt(p, viewYaw(renderer.xr.getCamera(camera))); arMsg("놓았습니다. 걸어 다니며 보세요. 말로 고치면 바로 반영됩니다"); });
+  session.addEventListener("end", () => { arHit = null; arSession = null; endAR(); });
+  renderer.setAnimationLoop((t, frame) => { if (frame && arHit && arRefSpace) { const hits = frame.getHitTestResults(arHit); if (hits.length && !arPlaced) { const pose = hits[0].getPose(arRefSpace); if (pose) { arReticle.visible = true; arReticle.matrix.fromArray(pose.transform.matrix); } } else arReticle.visible = false; } renderer.render(scene, camera); });
+}
+async function startCamAR() {
+  arStream = await navigator.mediaDevices.getUserMedia({video: {facingMode: {ideal: "environment"}, width: {ideal: 1280}}, audio: false});
+  arActive = true; arMode = "cam"; arVideo.srcObject = arStream; arVideo.hidden = false; await arVideo.play().catch(() => {});
+  if (!presenting) setPresent(true); document.body.classList.add("ar", "ar-cam"); arUI.hidden = false; $("#arMini").hidden = true; $("#arRe").hidden = true;
+  scene.background = null; holoGrid.visible = false; world.visible = true; world.position.set(0, 0, 0); world.rotation.set(0, 0, 0); world.scale.setScalar(1); applyARVis();
+  placeCamAtCenter(); walk = true; controls.enabled = false; camera.fov = 68; camera.updateProjectionMatrix(); camera.position.set(S.cam.x / 1000, S.cam.h / 1000, S.cam.y / 1000); resize3d();
+  const zee = new THREE.Vector3(0, 0, 1), euler = new THREE.Euler(), q0 = new THREE.Quaternion(), q1 = new THREE.Quaternion(-Math.sqrt(.5), 0, 0, Math.sqrt(.5)); let yawFix = null; arYaw = 0;
+  arOri = (e) => { if (e.alpha == null) return; const a = THREE.MathUtils.degToRad(e.alpha), b = THREE.MathUtils.degToRad(e.beta || 0), g = THREE.MathUtils.degToRad(e.gamma || 0), o = THREE.MathUtils.degToRad((screen.orientation && screen.orientation.angle) || window.orientation || 0);
+    euler.set(b, a, -g, "YXZ"); camera.quaternion.setFromEuler(euler); camera.quaternion.multiply(q1); camera.quaternion.multiply(q0.setFromAxisAngle(zee, -o));
+    if (yawFix === null) { yawFix = viewYaw(camera) - S.cam.dir; }   // 처음 자세 = 도면 카메라 방향
+    camera.quaternion.premultiply(new THREE.Quaternion().setFromAxisAngle(Y_AXIS, yawFix - arYaw)); };
+  if (window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission === "function") { try { await DeviceOrientationEvent.requestPermission(); } catch (e) {} }
+  window.addEventListener("deviceorientationabsolute", arOri); window.addEventListener("deviceorientation", arOri);
+  arMsg("카메라 모드: 폰을 돌리면 도면 속 같은 방향을 봅니다. ▲▼ 로 걷고, ↺↻ 로 방향을 맞추세요");
+  renderer.setAnimationLoop(() => { for (const m of meshByItem.values()) if (m.userData.billboard) m.rotation.y = Math.atan2(camera.position.x - m.position.x, camera.position.z - m.position.z); renderer.render(scene, camera); });
+}
+function endAR() {
+  if (!arActive) return; arActive = false; renderer.setAnimationLoop(null);
+  if (arSession) { const s = arSession; arSession = null; s.end().catch(() => {}); } renderer.xr.enabled = false;
+  if (arStream) { arStream.getTracks().forEach(t => t.stop()); arStream = null; } arVideo.srcObject = null; arVideo.hidden = true;
+  if (arOri) { window.removeEventListener("deviceorientationabsolute", arOri); window.removeEventListener("deviceorientation", arOri); arOri = null; }
+  document.body.classList.remove("ar", "ar-cam"); arUI.hidden = true; if (arReticle) arReticle.visible = false;
+  world.visible = true; world.position.copy(arSaved.pos); world.rotation.copy(arSaved.rot); world.scale.copy(arSaved.scale); scene.background = arSaved.bg; holoGrid.visible = arSaved.grid; camera.fov = arSaved.fov; camera.updateProjectionMatrix(); applyARVis();
+  controls.enabled = true; resize3d(); viewAerial(false); if (arMode === "cam" && !arSaved.presenting) setPresent(false); arMode = ""; setStatus("AR 보기를 끝냈습니다.");
+}
+$("#zAR").addEventListener("click", () => { startAR(); });
+$("#arExit").addEventListener("click", endAR);
+$("#arL").addEventListener("click", () => { arYaw += Math.PI / 12; if (arMode === "xr" && arAnchor) { world.rotation.y += Math.PI / 12; const off = new THREE.Vector3(S.cam.x / 1000, 0, S.cam.y / 1000).applyAxisAngle(Y_AXIS, world.rotation.y).multiplyScalar(arScale); world.position.copy(arAnchor).sub(off); applyARVis(); } });
+$("#arR").addEventListener("click", () => { arYaw -= Math.PI / 12; if (arMode === "xr" && arAnchor) { world.rotation.y -= Math.PI / 12; const off = new THREE.Vector3(S.cam.x / 1000, 0, S.cam.y / 1000).applyAxisAngle(Y_AXIS, world.rotation.y).multiplyScalar(arScale); world.position.copy(arAnchor).sub(off); applyARVis(); } });
+function arStep(sign) { if (arMode === "cam") { const d = new THREE.Vector3(); camera.getWorldDirection(d); d.y = 0; d.normalize().multiplyScalar(.5 * sign); camera.position.add(d); } else if (arMode === "xr" && arPlaced) { const d = new THREE.Vector3(); renderer.xr.getCamera(camera).getWorldDirection(d); d.y = 0; d.normalize().multiplyScalar(.5 * sign); world.position.sub(d); if (arAnchor) arAnchor.sub(d); applyARVis(); } }
+$("#arFwd").addEventListener("click", () => arStep(1)); $("#arBack").addEventListener("click", () => arStep(-1));
+$("#arMini").addEventListener("click", () => { arScale = arScale === 1 ? .05 : 1; $("#arMini").textContent = arScale === 1 ? "미니어처" : "실제 크기"; if (arMode === "xr" && arAnchor) { world.scale.setScalar(arScale); const off = new THREE.Vector3(S.cam.x / 1000, 0, S.cam.y / 1000).applyAxisAngle(Y_AXIS, world.rotation.y).multiplyScalar(arScale); world.position.copy(arAnchor).sub(off); applyARVis(); } });
+$("#arCeil").addEventListener("click", () => { arShowCeil = !arShowCeil; $("#arCeil").textContent = arShowCeil ? "천장 숨기기" : "천장"; applyARVis(); });
+$("#arRe").addEventListener("click", () => { if (arMode === "xr") { arPlaced = false; world.visible = false; arMsg("바닥을 비추고 다시 누르세요"); } });
+$("#arGo").addEventListener("click", async () => { const inp = $("#arCmd"); const t = inp.value.trim(); if (!t) return; inp.value = ""; const ph = inp.placeholder; inp.placeholder = "고치는 중…"; inp.disabled = true; const r = await runCommand(t); inp.disabled = false; inp.placeholder = r; setTimeout(() => { if (inp.placeholder === r) inp.placeholder = ph; }, 9000); });
+$("#arCmd").addEventListener("keydown", (e) => { if (e.key === "Enter") $("#arGo").click(); });
 function pick3(e) { const r = c3.getBoundingClientRect(); const m = new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1); raycaster.setFromCamera(m, camera); return raycaster; }
 const wallMeshes = () => world.children.filter(o => o.userData.wall);
 function on3down(e) { if (step === 2) { const rc = pick3(e); const hits = rc.intersectObjects(wallMeshes(), true); if (hits.length) { let o = hits[0].object; while (o && !o.userData.wall) o = o.parent; selWall = o ? o.userData.wall : null; } else selWall = null; rebuild3d(); renderPanel(); return; } if (step !== 3 && step !== 4) return; const rc = pick3(e); const hits = rc.intersectObjects([...meshByItem.values()], true); if (hits.length) { let o = hits[0].object; while (o && !o.userData.item) o = o.parent; if (o) { sel = o.userData.item; selWall = null; const p = new THREE.Vector3(); rc.ray.intersectPlane(floorPlane, p); drag3 = {it: sel, dx: sel.x - p.x * 1000, dy: sel.y - p.z * 1000, moved: false}; controls.enabled = false; pushUndo(); rebuild3d(); renderPanel(); try { c3.setPointerCapture(e.pointerId); } catch (err) {} return; } } if (walk && step === 4) { const p = new THREE.Vector3(); if (rc.ray.intersectPlane(floorPlane, p)) { drag3 = {walkTo: p}; } } }
