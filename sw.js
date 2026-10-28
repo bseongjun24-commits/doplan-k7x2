@@ -1,4 +1,4 @@
-const VERSION = "20261028-2111";
+const VERSION = "20261028-2116";
 const SHELL = ["./", "./index.html", "./manifest.webmanifest", "./icons/icon-192.png", "./icons/icon-512.png"];
 const CDN = ["https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js", "https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"];
 self.addEventListener("install", (e) => { e.waitUntil((async () => { const c = await caches.open("shell-" + VERSION); await c.addAll(SHELL); for (const u of CDN) { try { const r = await fetch(u, {mode: "cors"}); if (r.ok) await c.put(u, r); } catch (err) {} } self.skipWaiting(); })()); });
